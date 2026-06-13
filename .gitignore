@@ -1,0 +1,15 @@
+# Local Claude Code config / skills — not part of the deployable app
+/.claude
+/.claude/**
+
+/node_modules
+/.next
+/out
+/build
+.DS_Store
+*.pem
+.env*.local
+.vercel
+next-env.d.ts
+*.tsbuildinfo
+npm-debug.log*
