@@ -1,16 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Twitter, Instagram, Linkedin, Github, Dribbble, ArrowUp } from "lucide-react";
+import { Linkedin, Github, ArrowUp } from "lucide-react";
 import { navLinks, services } from "@/lib/data";
 import { site } from "@/lib/site";
 
 const socials = [
-  { icon: Twitter, href: site.socials.twitter, label: "Twitter" },
-  { icon: Instagram, href: site.socials.instagram, label: "Instagram" },
   { icon: Linkedin, href: site.socials.linkedin, label: "LinkedIn" },
   { icon: Github, href: site.socials.github, label: "GitHub" },
-  { icon: Dribbble, href: site.socials.dribbble, label: "Dribbble" },
 ];
 
 export default function Footer() {

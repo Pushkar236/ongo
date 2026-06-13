@@ -4,17 +4,15 @@ export const site = {
   tagline: "Your Business. Online. OnGo.",
   description:
     "OnGo builds high-performance websites, e-commerce stores, and web applications that attract customers and grow revenue for startups, local businesses, and agencies.",
-  url: "https://ongo.agency",
-  email: "hello@ongo.agency",
-  phoneDisplay: "+91 98765 43210",
+  // TODO: swap to your custom domain once connected in Vercel.
+  url: "https://ongo-mauve.vercel.app",
+  email: "pdkirange236@gmail.com",
+  phoneDisplay: "+91 93258 68296",
   // Digits only, international format — used for the WhatsApp deep link.
-  whatsapp: "919876543210",
+  whatsapp: "919325868296",
   socials: {
-    twitter: "https://twitter.com/",
-    instagram: "https://instagram.com/",
-    linkedin: "https://linkedin.com/",
-    github: "https://github.com/",
-    dribbble: "https://dribbble.com/",
+    linkedin: "https://www.linkedin.com/in/pushkar-kirange-8b8a15298/",
+    github: "https://github.com/Pushkar236",
   },
 } as const;
 
