@@ -40,7 +40,8 @@ export default function Hero() {
       {chips.map((chip) => (
         <motion.div
           key={chip.label}
-          className={`absolute hidden md:block ${chip.className}`}
+          aria-hidden
+          className={`pointer-events-none absolute hidden md:block ${chip.className}`}
           animate={{ y: [0, -16, 0] }}
           transition={{
             duration: 5,
@@ -64,7 +65,7 @@ export default function Hero() {
         >
           <motion.div variants={item}>
             <span className="eyebrow">
-              <Zap className="h-3.5 w-3.5 text-brand-cyan" />
+              <Zap className="h-3.5 w-3.5 text-brand-cyan" aria-hidden />
               {site.tagline}
             </span>
           </motion.div>
@@ -91,10 +92,10 @@ export default function Hero() {
           >
             <Button href="#contact" variant="primary">
               Get Free Consultation
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden />
             </Button>
             <Button href="#portfolio" variant="ghost">
-              <Play className="h-4 w-4 text-brand-cyan" />
+              <Play className="h-4 w-4 text-brand-cyan" aria-hidden />
               View Portfolio
             </Button>
           </motion.div>
@@ -110,6 +111,7 @@ export default function Hero() {
                     <span
                       key={i}
                       className={`h-7 w-7 rounded-full border-2 border-ink-900 bg-gradient-to-br ${c} to-ink-700`}
+                      aria-hidden
                     />
                   )
                 )}
@@ -122,6 +124,7 @@ export default function Hero() {
                   <Star
                     key={i}
                     className="h-4 w-4 fill-amber-400 text-amber-400"
+                    aria-hidden
                   />
                 ))}
               </div>

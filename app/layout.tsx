@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Bricolage_Grotesque } from "next/font/google";
+import { MotionConfig } from "framer-motion";
 import "./globals.css";
 import { site } from "@/lib/site";
 import CursorEffect from "@/components/ui/CursorEffect";
@@ -36,6 +37,7 @@ export const metadata: Metadata = {
     "SEO",
     "OnGo",
   ],
+  alternates: { canonical: "/" },
   authors: [{ name: site.name }],
   openGraph: {
     title: `${site.name} — ${site.tagline}`,
@@ -67,6 +69,9 @@ const jsonLd = {
   description: site.description,
   email: site.email,
   slogan: site.tagline,
+  logo: `${site.url}/icon.svg`,
+  image: `${site.url}/opengraph-image`,
+  sameAs: Object.values(site.socials),
 };
 
 export default function RootLayout({
@@ -81,9 +86,13 @@ export default function RootLayout({
         />
         {/* Fine grain overlay for depth — sits above the page, ignores input */}
         <div className="grain-overlay" aria-hidden />
-        <Preloader />
-        <CursorEffect />
-        {children}
+        {/* reducedMotion="user" disables transform/loop animations (e.g. the
+            infinite hero chips) for users who ask for it, keeping opacity fades */}
+        <MotionConfig reducedMotion="user">
+          <Preloader />
+          <CursorEffect />
+          {children}
+        </MotionConfig>
       </body>
     </html>
   );

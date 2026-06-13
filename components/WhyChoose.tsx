@@ -38,7 +38,7 @@ export default function WhyChoose() {
                   className="card-glow glass relative h-full rounded-3xl p-8 text-center"
                 >
                   <div className="mx-auto mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-blue/20 to-brand-purple/20 ring-1 ring-white/10">
-                    <Icon className="h-6 w-6 text-brand-cyan" />
+                    <Icon className="h-6 w-6 text-brand-cyan" aria-hidden />
                   </div>
                   <div className="font-display text-4xl font-extrabold text-white sm:text-5xl">
                     {stat.isText ? (
@@ -61,7 +61,7 @@ export default function WhyChoose() {
             <div className="grid gap-4 sm:grid-cols-2">
               {reasons.map((reason) => (
                 <div key={reason} className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand-cyan" />
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand-cyan" aria-hidden />
                   <span className="text-sm text-slate-300">{reason}</span>
                 </div>
               ))}

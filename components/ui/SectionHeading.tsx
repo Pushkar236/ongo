@@ -25,7 +25,7 @@ export default function SectionHeading({
     <div className={`flex max-w-2xl flex-col gap-4 ${alignment}`}>
       <Reveal>
         <span className="eyebrow">
-          <Sparkles className="h-3.5 w-3.5 text-brand-cyan" />
+          <Sparkles className="h-3.5 w-3.5 text-brand-cyan" aria-hidden />
           {eyebrow}
         </span>
       </Reveal>

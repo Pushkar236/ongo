@@ -48,7 +48,7 @@ export default function Pricing() {
                         }}
                       />
                       <span className="absolute -top-3.5 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-blue to-brand-purple px-4 py-1.5 text-xs font-semibold text-white shadow-glow">
-                        <Sparkles className="h-3.5 w-3.5" /> Most Popular
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden /> Most Popular
                       </span>
                     </>
                   )}
@@ -80,7 +80,7 @@ export default function Pricing() {
                                 : "bg-white/10"
                             }`}
                           >
-                            <Check className="h-3 w-3 text-white" />
+                            <Check className="h-3 w-3 text-white" aria-hidden />
                           </span>
                           {feature}
                         </li>
@@ -109,7 +109,7 @@ export default function Pricing() {
         <Reveal delay={0.15}>
           <p className="mt-10 text-center text-sm text-slate-500">
             Need something custom?{" "}
-            <a href="#contact" className="text-brand-cyan hover:underline">
+            <a href="#contact" className="text-brand-cyan hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900">
               Let&apos;s build a tailored plan together →
             </a>
           </p>

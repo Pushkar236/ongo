@@ -1,16 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Twitter, Instagram, Linkedin, Github, Dribbble, ArrowUp } from "lucide-react";
+import { Linkedin, Github, ArrowUp } from "lucide-react";
 import { navLinks, services } from "@/lib/data";
 import { site } from "@/lib/site";
 
 const socials = [
-  { icon: Twitter, href: site.socials.twitter, label: "Twitter" },
-  { icon: Instagram, href: site.socials.instagram, label: "Instagram" },
   { icon: Linkedin, href: site.socials.linkedin, label: "LinkedIn" },
   { icon: Github, href: site.socials.github, label: "GitHub" },
-  { icon: Dribbble, href: site.socials.dribbble, label: "Dribbble" },
 ];
 
 export default function Footer() {
@@ -40,9 +37,9 @@ export default function Footer() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={s.label}
-                    className="glass flex h-10 w-10 items-center justify-center rounded-xl text-slate-300 transition-all hover:-translate-y-1 hover:text-brand-cyan hover:shadow-glow-cyan"
+                    className="glass flex h-10 w-10 items-center justify-center rounded-xl text-slate-300 transition-all hover:-translate-y-1 hover:text-brand-cyan hover:shadow-glow-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
                   >
-                    <Icon className="h-[18px] w-[18px]" />
+                    <Icon className="h-[18px] w-[18px]" aria-hidden />
                   </a>
                 );
               })}
@@ -59,7 +56,7 @@ export default function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-slate-400 transition-colors hover:text-brand-cyan"
+                    className="text-sm text-slate-400 transition-colors hover:text-brand-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
                   >
                     {link.label}
                   </Link>
@@ -78,7 +75,7 @@ export default function Footer() {
                 <li key={service.title}>
                   <Link
                     href="#services"
-                    className="text-sm text-slate-400 transition-colors hover:text-brand-cyan"
+                    className="text-sm text-slate-400 transition-colors hover:text-brand-cyan focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
                   >
                     {service.title}
                   </Link>
@@ -94,9 +91,9 @@ export default function Footer() {
           </p>
           <a
             href="#home"
-            className="glass inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium text-slate-300 transition-colors hover:text-white"
+            className="glass inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium text-slate-300 transition-colors hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
           >
-            Back to top <ArrowUp className="h-3.5 w-3.5" />
+            Back to top <ArrowUp className="h-3.5 w-3.5" aria-hidden />
           </a>
         </div>
       </div>

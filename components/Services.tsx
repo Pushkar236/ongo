@@ -55,7 +55,7 @@ export default function Services() {
                   <div
                     className={`relative mb-6 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${accent.bg} to-transparent ring-1 ring-white/10 transition-all ${accent.ring}`}
                   >
-                    <Icon className={`h-6 w-6 ${accent.text}`} />
+                    <Icon className={`h-6 w-6 ${accent.text}`} aria-hidden />
                   </div>
                   <h3 className="relative font-display text-xl font-semibold text-white">
                     {service.title}
@@ -65,7 +65,7 @@ export default function Services() {
                   </p>
                   <div className="relative mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-slate-300 transition-colors group-hover:text-white">
                     Learn more
-                    <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                    <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
                   </div>
                 </motion.article>
               </Reveal>
