@@ -113,7 +113,7 @@ export default function Contact() {
                       <a
                         key={item.label}
                         href={item.href}
-                        className="block transition-opacity hover:opacity-80"
+                        className="block transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
                       >
                         {inner}
                       </a>
@@ -273,7 +273,7 @@ export default function Contact() {
                         href={fallbackUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-semibold text-brand-cyan underline underline-offset-2"
+                        className="font-semibold text-brand-cyan underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
                       >
                         Didn&apos;t open? Tap here.
                       </a>

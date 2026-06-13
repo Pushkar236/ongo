@@ -27,7 +27,7 @@ export default function About() {
                   className="card-glow glass group h-full rounded-3xl p-7"
                 >
                   <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-blue/20 to-brand-purple/20 ring-1 ring-white/10 transition-all group-hover:ring-brand-cyan/40">
-                    <Icon className="h-6 w-6 text-brand-cyan" />
+                    <Icon className="h-6 w-6 text-brand-cyan" aria-hidden />
                   </div>
                   <h3 className="font-display text-lg font-semibold text-white">
                     {feature.title}

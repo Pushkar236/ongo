@@ -26,7 +26,7 @@ export default function Portfolio() {
                   whileHover={{ y: -8 }}
                   transition={{ type: "spring", stiffness: 280, damping: 20 }}
                   data-cursor="hover"
-                  className="group relative h-full overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03]"
+                  className="group relative h-full overflow-hidden rounded-3xl glass card-glow"
                 >
                   {/* Preview window */}
                   <div className="relative aspect-[16/11] overflow-hidden">
@@ -41,12 +41,12 @@ export default function Portfolio() {
                       <span className="ml-3 h-4 flex-1 rounded-full bg-white/20" />
                     </div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Icon className="h-16 w-16 text-white/90 drop-shadow-lg transition-transform duration-500 group-hover:scale-110" />
+                      <Icon className="h-16 w-16 text-white/90 drop-shadow-lg transition-transform duration-500 group-hover:scale-110" aria-hidden />
                     </div>
                     {/* Hover overlay */}
                     <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/80 via-black/20 to-transparent p-6 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white backdrop-blur-md">
-                        View Project <ArrowUpRight className="h-4 w-4" />
+                        View Project <ArrowUpRight className="h-4 w-4" aria-hidden />
                       </span>
                     </div>
                   </div>

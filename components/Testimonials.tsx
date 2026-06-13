@@ -34,12 +34,13 @@ export default function Testimonials() {
                 transition={{ type: "spring", stiffness: 280, damping: 20 }}
                 className="card-glow glass relative flex h-full flex-col rounded-3xl p-8"
               >
-                <Quote className="absolute right-7 top-7 h-10 w-10 text-white/[0.06]" />
+                <Quote className="absolute right-7 top-7 h-10 w-10 text-white/[0.06]" aria-hidden />
                 <div className="flex gap-1">
                   {Array.from({ length: t.rating }).map((_, s) => (
                     <Star
                       key={s}
                       className="h-4 w-4 fill-amber-400 text-amber-400"
+                      aria-hidden
                     />
                   ))}
                 </div>

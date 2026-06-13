@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Bricolage_Grotesque } from "next/font/google";
+import { MotionConfig } from "framer-motion";
 import "./globals.css";
 import { site } from "@/lib/site";
 import CursorEffect from "@/components/ui/CursorEffect";
@@ -81,9 +82,13 @@ export default function RootLayout({
         />
         {/* Fine grain overlay for depth — sits above the page, ignores input */}
         <div className="grain-overlay" aria-hidden />
-        <Preloader />
-        <CursorEffect />
-        {children}
+        {/* reducedMotion="user" disables transform/loop animations (e.g. the
+            infinite hero chips) for users who ask for it, keeping opacity fades */}
+        <MotionConfig reducedMotion="user">
+          <Preloader />
+          <CursorEffect />
+          {children}
+        </MotionConfig>
       </body>
     </html>
   );

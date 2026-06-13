@@ -7,8 +7,16 @@ export default function Preloader() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Keep it to a brief brand flash so it doesn't delay LCP / first paint.
-    const t = setTimeout(() => setLoading(false), 800);
+    // Only show the brand flash on the first visit of a session, and never for
+    // reduced-motion users — so it can't gate LCP on repeat views.
+    const seen = sessionStorage.getItem("ongo_seen");
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (seen || reduce) {
+      setLoading(false);
+      return;
+    }
+    sessionStorage.setItem("ongo_seen", "1");
+    const t = setTimeout(() => setLoading(false), 400);
     return () => clearTimeout(t);
   }, []);
 
@@ -19,7 +27,7 @@ export default function Preloader() {
           className="fixed inset-0 z-[10000] flex items-center justify-center bg-ink-900"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.4, ease: "easeInOut" }}
+          transition={{ duration: 0.25, ease: "easeInOut" }}
         >
           <div className="flex flex-col items-center gap-6">
             <motion.div

@@ -42,7 +42,16 @@ export default function OpengraphImage() {
           </div>
           <div style={{ display: "flex", fontSize: "34px", fontWeight: 800, color: "#fff" }}>
             On
-            <span style={{ color: "#06B6D4" }}>Go</span>
+            <span
+              style={{
+                background: "linear-gradient(135deg, #2563EB, #06B6D4, #8B5CF6)",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                color: "transparent",
+              }}
+            >
+              Go
+            </span>
           </div>
         </div>
 
