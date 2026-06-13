@@ -24,6 +24,7 @@ export const navLinks: NavLink[] = [
   { label: "Pricing", href: "#pricing" },
   { label: "Portfolio", href: "#portfolio" },
   { label: "Testimonials", href: "#testimonials" },
+  { label: "FAQ", href: "#faq" },
   { label: "Contact", href: "#contact" },
 ];
 
@@ -268,5 +269,40 @@ export const testimonials: Testimonial[] = [
     rating: 5,
     initials: "SK",
     accent: "purple",
+  },
+];
+
+export type Faq = { question: string; answer: string };
+
+export const faqs: Faq[] = [
+  {
+    question: "How much does a website cost?",
+    answer:
+      "Our website packages start at ₹19,999 for a clean 5-page business site and go up to ₹69,999 for a premium build with custom design, a booking system, and advanced features. Every package is customizable — tell us your goals and we'll give you a clear, fixed quote with no hidden costs.",
+  },
+  {
+    question: "How long does it take to build a website?",
+    answer:
+      "Most websites are designed, built, and launched within 1–2 weeks. Simple landing pages can go live in just a few days, while larger e-commerce stores or custom web applications may take a little longer. We'll share a realistic timeline before we start.",
+  },
+  {
+    question: "Do you build e-commerce stores and online shops?",
+    answer:
+      "Yes. We build fast, secure e-commerce websites with seamless checkout, payment integration, and inventory management — everything you need to start selling online and turn visitors into paying customers.",
+  },
+  {
+    question: "Will my website be mobile-friendly and SEO-optimized?",
+    answer:
+      "Absolutely. Every OnGo website is fully responsive across phones, tablets, and desktops, and is built on a fast, SEO-ready foundation — clean code, proper structure, and quick load times — so your business can be found on Google.",
+  },
+  {
+    question: "Do you offer website maintenance and support?",
+    answer:
+      "Yes. We provide ongoing maintenance, security updates, and performance optimization to keep your website running smoothly. You'll always have a team to call when you need a change or have a question.",
+  },
+  {
+    question: "Can you redesign my existing website?",
+    answer:
+      "Definitely. We transform dated or underperforming websites into modern, high-converting experiences — keeping what works, fixing what doesn't, and giving your brand a premium new look that drives results.",
   },
 ];

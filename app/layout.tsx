@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Bricolage_Grotesque } from "next/font/google";
 import { MotionConfig } from "framer-motion";
 import "./globals.css";
 import { site } from "@/lib/site";
+import { services, testimonials } from "@/lib/data";
 import CursorEffect from "@/components/ui/CursorEffect";
 import Preloader from "@/components/ui/Preloader";
 
@@ -29,12 +30,17 @@ export const metadata: Metadata = {
   },
   description: site.description,
   keywords: [
-    "web development",
-    "web design agency",
+    "web development agency",
+    "website design",
+    "custom website development",
     "e-commerce development",
-    "custom web applications",
-    "landing pages",
-    "SEO",
+    "web application development",
+    "landing page design",
+    "website redesign",
+    "website maintenance",
+    "SEO services",
+    "small business website",
+    "affordable web design India",
     "OnGo",
   ],
   alternates: { canonical: "/" },
@@ -63,15 +69,70 @@ export const viewport: Viewport = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "Organization",
-  name: site.name,
-  url: site.url,
-  description: site.description,
-  email: site.email,
-  slogan: site.tagline,
-  logo: `${site.url}/icon.svg`,
-  image: `${site.url}/opengraph-image`,
-  sameAs: Object.values(site.socials),
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${site.url}/#organization`,
+      name: site.name,
+      url: site.url,
+      description: site.description,
+      email: site.email,
+      slogan: site.tagline,
+      logo: `${site.url}/icon.svg`,
+      image: `${site.url}/opengraph-image`,
+      sameAs: Object.values(site.socials),
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${site.url}/#website`,
+      url: site.url,
+      name: site.name,
+      inLanguage: "en",
+      publisher: { "@id": `${site.url}/#organization` },
+    },
+    {
+      "@type": "ProfessionalService",
+      "@id": `${site.url}/#service`,
+      name: site.name,
+      url: site.url,
+      description: site.description,
+      image: `${site.url}/opengraph-image`,
+      priceRange: "₹₹",
+      parentOrganization: { "@id": `${site.url}/#organization` },
+      areaServed: [
+        { "@type": "Country", name: "India" },
+        { "@type": "Place", name: "Worldwide" },
+      ],
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: "5",
+        reviewCount: String(testimonials.length),
+        bestRating: "5",
+      },
+      review: testimonials.map((t) => ({
+        "@type": "Review",
+        reviewRating: {
+          "@type": "Rating",
+          ratingValue: String(t.rating),
+          bestRating: "5",
+        },
+        author: { "@type": "Person", name: t.name },
+        reviewBody: t.quote,
+      })),
+      hasOfferCatalog: {
+        "@type": "OfferCatalog",
+        name: "Web Development Services",
+        itemListElement: services.map((s) => ({
+          "@type": "Offer",
+          itemOffered: {
+            "@type": "Service",
+            name: s.title,
+            description: s.description,
+          },
+        })),
+      },
+    },
+  ],
 };
 
 export default function RootLayout({

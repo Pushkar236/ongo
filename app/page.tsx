@@ -7,6 +7,7 @@ import WhyChoose from "@/components/WhyChoose";
 import Pricing from "@/components/Pricing";
 import Portfolio from "@/components/Portfolio";
 import Testimonials from "@/components/Testimonials";
+import FAQ from "@/components/FAQ";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
 
@@ -23,6 +24,7 @@ export default function Home() {
         <Pricing />
         <Portfolio />
         <Testimonials />
+        <FAQ />
         <Contact />
       </main>
       <Footer />
