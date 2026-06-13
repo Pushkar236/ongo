@@ -7,7 +7,8 @@ export default function Preloader() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 1500);
+    // Keep it to a brief brand flash so it doesn't delay LCP / first paint.
+    const t = setTimeout(() => setLoading(false), 800);
     return () => clearTimeout(t);
   }, []);
 
@@ -18,7 +19,7 @@ export default function Preloader() {
           className="fixed inset-0 z-[10000] flex items-center justify-center bg-ink-900"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.6, ease: "easeInOut" }}
+          transition={{ duration: 0.4, ease: "easeInOut" }}
         >
           <div className="flex flex-col items-center gap-6">
             <motion.div
@@ -37,7 +38,7 @@ export default function Preloader() {
                 className="h-full rounded-full bg-gradient-to-r from-brand-blue via-brand-cyan to-brand-purple"
                 initial={{ x: "-100%" }}
                 animate={{ x: "0%" }}
-                transition={{ duration: 1.3, ease: "easeInOut" }}
+                transition={{ duration: 0.7, ease: "easeInOut" }}
               />
             </div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
