@@ -37,6 +37,7 @@ export const metadata: Metadata = {
     "SEO",
     "OnGo",
   ],
+  alternates: { canonical: "/" },
   authors: [{ name: site.name }],
   openGraph: {
     title: `${site.name} — ${site.tagline}`,
@@ -68,6 +69,9 @@ const jsonLd = {
   description: site.description,
   email: site.email,
   slogan: site.tagline,
+  logo: `${site.url}/icon.svg`,
+  image: `${site.url}/opengraph-image`,
+  sameAs: Object.values(site.socials),
 };
 
 export default function RootLayout({
