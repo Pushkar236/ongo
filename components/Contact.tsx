@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
   Mail,
@@ -26,6 +26,9 @@ export default function Contact() {
   const [fields, setFields] = useState<Fields>(empty);
   const [errors, setErrors] = useState<Partial<Fields>>({});
   const [sent, setSent] = useState(false);
+  // Holds the prefilled WhatsApp URL so we can show a manual link if the
+  // browser blocks the popup that submit tries to open.
+  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
 
   const update = (key: keyof Fields, value: string) => {
     setFields((f) => ({ ...f, [key]: value }));
@@ -50,10 +53,13 @@ export default function Contact() {
     if (!validate()) return;
     // No backend in this build — open a pre-filled WhatsApp chat as the channel.
     const msg = `Hi OnGo! I'm ${fields.name}.\nEmail: ${fields.email}\nPhone: ${fields.phone}\n\n${fields.message}`;
-    window.open(whatsappLink(msg), "_blank", "noopener,noreferrer");
+    const url = whatsappLink(msg);
+    const win = window.open(url, "_blank", "noopener,noreferrer");
+    // If the popup was blocked, surface a clickable fallback instead of failing silently.
+    setFallbackUrl(win ? null : url);
     setSent(true);
     setFields(empty);
-    setTimeout(() => setSent(false), 6000);
+    setTimeout(() => setSent(false), 8000);
   };
 
   const inputBase =
@@ -78,7 +84,7 @@ export default function Contact() {
                 <h3 className="font-display text-xl font-semibold text-white">
                   Talk to a human, fast.
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                <p className="mt-2 text-sm leading-relaxed text-slate-300">
                   Prefer chatting? Message us on WhatsApp and we&apos;ll reply
                   right away.
                 </p>
@@ -96,7 +102,7 @@ export default function Contact() {
                     const inner = (
                       <div className="flex items-center gap-3">
                         <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-blue/20 to-brand-purple/20 ring-1 ring-white/10">
-                          <Icon className="h-5 w-5 text-brand-cyan" />
+                          <Icon className="h-5 w-5 text-brand-cyan" aria-hidden />
                         </span>
                         <span className="text-sm text-slate-200">
                           {item.label}
@@ -125,7 +131,7 @@ export default function Contact() {
                     variant="whatsapp"
                     className="w-full"
                   >
-                    <MessageCircle className="h-4 w-4" /> Chat on WhatsApp
+                    <MessageCircle className="h-4 w-4" aria-hidden /> Chat on WhatsApp
                   </Button>
                 </div>
               </div>
@@ -137,74 +143,109 @@ export default function Contact() {
             <form
               onSubmit={onSubmit}
               noValidate
+              aria-label="Project inquiry form"
               className="card-glow glass rounded-3xl p-8 sm:p-10"
             >
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field
-                  icon={<User className="h-4 w-4" />}
+                  id="contact-name"
+                  label="Your name"
+                  icon={<User className="h-4 w-4" aria-hidden />}
                   error={errors.name}
                 >
-                  <input
-                    type="text"
-                    placeholder="Your name"
-                    value={fields.name}
-                    onChange={(e) => update("name", e.target.value)}
-                    className={`${inputBase} ${
-                      errors.name ? "border-red-500/60" : "border-white/10"
-                    }`}
-                  />
+                  {({ id, describedBy, invalid }) => (
+                    <input
+                      id={id}
+                      type="text"
+                      autoComplete="name"
+                      placeholder="Your name"
+                      aria-invalid={invalid}
+                      aria-describedby={describedBy}
+                      value={fields.name}
+                      onChange={(e) => update("name", e.target.value)}
+                      className={`${inputBase} ${
+                        errors.name ? "border-red-500/60" : "border-white/10"
+                      }`}
+                    />
+                  )}
                 </Field>
                 <Field
-                  icon={<Phone className="h-4 w-4" />}
+                  id="contact-phone"
+                  label="Phone number"
+                  icon={<Phone className="h-4 w-4" aria-hidden />}
                   error={errors.phone}
                 >
-                  <input
-                    type="tel"
-                    placeholder="Phone number"
-                    value={fields.phone}
-                    onChange={(e) => update("phone", e.target.value)}
-                    className={`${inputBase} ${
-                      errors.phone ? "border-red-500/60" : "border-white/10"
-                    }`}
-                  />
-                </Field>
-              </div>
-
-              <div className="mt-5">
-                <Field icon={<Mail className="h-4 w-4" />} error={errors.email}>
-                  <input
-                    type="email"
-                    placeholder="Email address"
-                    value={fields.email}
-                    onChange={(e) => update("email", e.target.value)}
-                    className={`${inputBase} ${
-                      errors.email ? "border-red-500/60" : "border-white/10"
-                    }`}
-                  />
+                  {({ id, describedBy, invalid }) => (
+                    <input
+                      id={id}
+                      type="tel"
+                      autoComplete="tel"
+                      placeholder="Phone number"
+                      aria-invalid={invalid}
+                      aria-describedby={describedBy}
+                      value={fields.phone}
+                      onChange={(e) => update("phone", e.target.value)}
+                      className={`${inputBase} ${
+                        errors.phone ? "border-red-500/60" : "border-white/10"
+                      }`}
+                    />
+                  )}
                 </Field>
               </div>
 
               <div className="mt-5">
                 <Field
-                  icon={<MessageSquare className="h-4 w-4" />}
+                  id="contact-email"
+                  label="Email address"
+                  icon={<Mail className="h-4 w-4" aria-hidden />}
+                  error={errors.email}
+                >
+                  {({ id, describedBy, invalid }) => (
+                    <input
+                      id={id}
+                      type="email"
+                      autoComplete="email"
+                      placeholder="Email address"
+                      aria-invalid={invalid}
+                      aria-describedby={describedBy}
+                      value={fields.email}
+                      onChange={(e) => update("email", e.target.value)}
+                      className={`${inputBase} ${
+                        errors.email ? "border-red-500/60" : "border-white/10"
+                      }`}
+                    />
+                  )}
+                </Field>
+              </div>
+
+              <div className="mt-5">
+                <Field
+                  id="contact-message"
+                  label="Project details"
+                  icon={<MessageSquare className="h-4 w-4" aria-hidden />}
                   error={errors.message}
                   alignTop
                 >
-                  <textarea
-                    rows={5}
-                    placeholder="Tell us about your project…"
-                    value={fields.message}
-                    onChange={(e) => update("message", e.target.value)}
-                    className={`${inputBase} resize-none ${
-                      errors.message ? "border-red-500/60" : "border-white/10"
-                    }`}
-                  />
+                  {({ id, describedBy, invalid }) => (
+                    <textarea
+                      id={id}
+                      rows={5}
+                      placeholder="Tell us about your project…"
+                      aria-invalid={invalid}
+                      aria-describedby={describedBy}
+                      value={fields.message}
+                      onChange={(e) => update("message", e.target.value)}
+                      className={`${inputBase} resize-none ${
+                        errors.message ? "border-red-500/60" : "border-white/10"
+                      }`}
+                    />
+                  )}
                 </Field>
               </div>
 
               <div className="mt-7 flex flex-col items-center gap-4 sm:flex-row">
                 <Button type="submit" variant="primary" className="w-full sm:w-auto">
-                  <Send className="h-4 w-4" /> Send Inquiry
+                  <Send className="h-4 w-4" aria-hidden /> Send Inquiry
                 </Button>
                 <Button
                   href={whatsappLink("Hi OnGo, I'd like a free consultation.")}
@@ -212,20 +253,34 @@ export default function Contact() {
                   variant="whatsapp"
                   className="w-full sm:w-auto"
                 >
-                  <MessageCircle className="h-4 w-4" /> WhatsApp
+                  <MessageCircle className="h-4 w-4" aria-hidden /> WhatsApp
                 </Button>
               </div>
 
-              {sent && (
-                <motion.p
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-5 flex items-center gap-2 text-sm text-emerald-400"
-                >
-                  <CheckCircle2 className="h-4 w-4" /> Thanks! We&apos;ve opened
-                  WhatsApp so you can send your inquiry instantly.
-                </motion.p>
-              )}
+              {/* Live region so screen readers announce the result */}
+              <div aria-live="polite" role="status">
+                {sent && (
+                  <motion.p
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-emerald-400"
+                  >
+                    <CheckCircle2 className="h-4 w-4" aria-hidden />
+                    Thanks! We&apos;ve opened WhatsApp so you can send your
+                    inquiry instantly.
+                    {fallbackUrl && (
+                      <a
+                        href={fallbackUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-brand-cyan underline underline-offset-2"
+                      >
+                        Didn&apos;t open? Tap here.
+                      </a>
+                    )}
+                  </motion.p>
+                )}
+              </div>
             </form>
           </Reveal>
         </div>
@@ -234,19 +289,33 @@ export default function Contact() {
   );
 }
 
+type FieldRenderProps = {
+  id: string;
+  describedBy?: string;
+  invalid: boolean;
+};
+
 function Field({
+  id,
+  label,
   icon,
   error,
-  children,
   alignTop,
+  children,
 }: {
-  icon: React.ReactNode;
+  id: string;
+  label: string;
+  icon: ReactNode;
   error?: string;
-  children: React.ReactNode;
   alignTop?: boolean;
+  children: (props: FieldRenderProps) => ReactNode;
 }) {
+  const errorId = `${id}-error`;
   return (
     <div>
+      <label htmlFor={id} className="sr-only">
+        {label}
+      </label>
       <div className="relative">
         <span
           className={`pointer-events-none absolute left-4 text-slate-500 ${
@@ -255,9 +324,17 @@ function Field({
         >
           {icon}
         </span>
-        {children}
+        {children({
+          id,
+          describedBy: error ? errorId : undefined,
+          invalid: !!error,
+        })}
       </div>
-      {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
+      {error && (
+        <p id={errorId} role="alert" className="mt-1.5 text-xs text-red-400">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
