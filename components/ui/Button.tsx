@@ -14,6 +14,8 @@ type Props = {
   className?: string;
   type?: "button" | "submit";
   external?: boolean;
+  disabled?: boolean;
+  "aria-busy"?: boolean;
 };
 
 const base =
@@ -36,8 +38,12 @@ export default function Button({
   className = "",
   type = "button",
   external,
+  disabled,
+  "aria-busy": ariaBusy,
 }: Props) {
-  const classes = `${base} ${variants[variant]} ${className}`;
+  const classes = `${base} ${variants[variant]} ${
+    disabled ? "cursor-not-allowed opacity-60" : ""
+  } ${className}`;
   const content = (
     <motion.span
       whileHover={{ scale: 1.04 }}
@@ -69,7 +75,13 @@ export default function Button({
   }
 
   return (
-    <button type={type} onClick={onClick} className={classes}>
+    <button
+      type={type}
+      onClick={onClick}
+      className={classes}
+      disabled={disabled}
+      aria-busy={ariaBusy}
+    >
       {content}
     </button>
   );

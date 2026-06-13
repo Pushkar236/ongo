@@ -1,6 +1,7 @@
-# Local Claude Code config / skills — not part of the deployable app
+# Local Claude Code config / skills / MCP — not part of the deployable app
 /.claude
 /.claude/**
+/.mcp.json
 
 /node_modules
 /.next
@@ -10,6 +11,9 @@
 *.pem
 .env*.local
 .vercel
+.playwright-mcp
+qa-*.jpeg
+qa-*.png
 next-env.d.ts
 *.tsbuildinfo
 npm-debug.log*

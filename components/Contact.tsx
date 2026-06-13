@@ -24,10 +24,17 @@ const empty: Fields = { name: "", email: "", phone: "", message: "" };
 
 export default function Contact() {
   const [fields, setFields] = useState<Fields>(empty);
+  // Honeypot: hidden from real users; only bots that auto-fill every input
+  // will populate it. A non-empty value flags the submission as spam.
+  const [company, setCompany] = useState("");
   const [errors, setErrors] = useState<Partial<Fields>>({});
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  // "email" = inquiry was emailed to the owner via the backend.
+  // "whatsapp" = backend failed, so we fell back to the WhatsApp deep link.
+  const [mode, setMode] = useState<"email" | "whatsapp">("email");
   // Holds the prefilled WhatsApp URL so we can show a manual link if the
-  // browser blocks the popup that submit tries to open.
+  // browser blocks the popup that the WhatsApp fallback tries to open.
   const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
 
   const update = (key: keyof Fields, value: string) => {
@@ -48,18 +55,50 @@ export default function Contact() {
     return Object.keys(next).length === 0;
   };
 
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-    // No backend in this build — open a pre-filled WhatsApp chat as the channel.
-    const msg = `Hi OnGo! I'm ${fields.name}.\nEmail: ${fields.email}\nPhone: ${fields.phone}\n\n${fields.message}`;
+  // Open the prefilled WhatsApp chat as the fallback channel. If the popup is
+  // blocked we surface a clickable link instead of failing silently.
+  const openWhatsAppFallback = (current: Fields) => {
+    const msg = `Hi OnGo! I'm ${current.name}.\nEmail: ${current.email}\nPhone: ${current.phone}\n\n${current.message}`;
     const url = whatsappLink(msg);
     const win = window.open(url, "_blank", "noopener,noreferrer");
-    // If the popup was blocked, surface a clickable fallback instead of failing silently.
     setFallbackUrl(win ? null : url);
-    setSent(true);
-    setFields(empty);
-    setTimeout(() => setSent(false), 8000);
+    setMode("whatsapp");
+  };
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!validate() || sending) return;
+
+    const current = fields;
+    setSending(true);
+    setSent(false);
+    setFallbackUrl(null);
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...current, company }),
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean } | null;
+
+      if (res.ok && data?.ok) {
+        // Email delivered to the owner via the backend.
+        setMode("email");
+        setFallbackUrl(null);
+        setFields(empty);
+      } else {
+        // Backend rejected/failed — gracefully fall back to WhatsApp.
+        openWhatsAppFallback(current);
+      }
+    } catch {
+      // Network error — fall back to WhatsApp.
+      openWhatsAppFallback(current);
+    } finally {
+      setSending(false);
+      setSent(true);
+      setTimeout(() => setSent(false), 8000);
+    }
   };
 
   const inputBase =
@@ -146,6 +185,21 @@ export default function Contact() {
               aria-label="Project inquiry form"
               className="card-glow glass rounded-3xl p-8 sm:p-10"
             >
+              {/* Honeypot field — hidden from real users, off the tab order and
+                  the a11y tree. Bots that fill every input get flagged as spam. */}
+              <div aria-hidden className="hidden">
+                <label htmlFor="contact-company">Company</label>
+                <input
+                  id="contact-company"
+                  type="text"
+                  name="company"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                />
+              </div>
+
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field
                   id="contact-name"
@@ -244,8 +298,15 @@ export default function Contact() {
               </div>
 
               <div className="mt-7 flex flex-col items-center gap-4 sm:flex-row">
-                <Button type="submit" variant="primary" className="w-full sm:w-auto">
-                  <Send className="h-4 w-4" aria-hidden /> Send Inquiry
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="w-full sm:w-auto"
+                  disabled={sending}
+                  aria-busy={sending}
+                >
+                  <Send className="h-4 w-4" aria-hidden />{" "}
+                  {sending ? "Sending…" : "Send Inquiry"}
                 </Button>
                 <Button
                   href={whatsappLink("Hi OnGo, I'd like a free consultation.")}
@@ -266,8 +327,9 @@ export default function Contact() {
                     className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-emerald-400"
                   >
                     <CheckCircle2 className="h-4 w-4" aria-hidden />
-                    Thanks! We&apos;ve opened WhatsApp so you can send your
-                    inquiry instantly.
+                    {mode === "email"
+                      ? "Thanks! Your inquiry is on its way — we'll reply within 24 hours."
+                      : "Thanks! We've opened WhatsApp so you can send your inquiry instantly."}
                     {fallbackUrl && (
                       <a
                         href={fallbackUrl}
