@@ -15,7 +15,20 @@ export interface Overview {
   pendingApprovals: number;
   deploymentsToday: number;
   newOpportunities: number;
+  newLeads: number;
   totalRevenue: number;
+}
+
+export interface Lead {
+  id: string;
+  source: string;
+  type: string;
+  status: string;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  request: { message?: string } | null;
+  createdAt: string;
+  opportunity?: { id: string; title: string } | null;
 }
 
 export interface Approval {

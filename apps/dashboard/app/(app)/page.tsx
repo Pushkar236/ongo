@@ -33,6 +33,12 @@ export default async function OverviewPage() {
         <StatCard label="Deploys Today" value={overview.deploymentsToday} accent="cyan" />
         <StatCard label="New Opportunities" value={overview.newOpportunities} accent="purple" />
         <StatCard
+          label="New Leads"
+          value={overview.newLeads}
+          accent="cyan"
+          hint={overview.newLeads > 0 ? "from the marketplace" : undefined}
+        />
+        <StatCard
           label="Total Revenue"
           value={inr(overview.totalRevenue)}
           accent="blue"

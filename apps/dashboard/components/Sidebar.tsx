@@ -10,6 +10,7 @@ import {
   Lightbulb,
   Bot,
   Workflow,
+  Inbox,
   LogOut,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/types";
@@ -21,6 +22,7 @@ const NAV = [
   { href: "/activity", label: "Agent Activity", icon: Activity },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/opportunities", label: "Opportunities", icon: Lightbulb },
+  { href: "/leads", label: "Marketplace Leads", icon: Inbox },
   { href: "/agents", label: "Agents", icon: Bot },
 ];
 

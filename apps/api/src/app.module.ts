@@ -10,6 +10,7 @@ import { AgentsModule } from "./agents/agents.module";
 import { ProjectsModule } from "./projects/projects.module";
 import { TasksModule } from "./tasks/tasks.module";
 import { OpportunitiesModule } from "./opportunities/opportunities.module";
+import { LeadsModule } from "./leads/leads.module";
 import { ApprovalsModule } from "./approvals/approvals.module";
 import { ActivityModule } from "./activity/activity.module";
 import { BrainModule } from "./brain/brain.module";
@@ -37,6 +38,7 @@ import { AuditInterceptor } from "./common/interceptors/audit.interceptor";
     ProjectsModule,
     TasksModule,
     OpportunitiesModule,
+    LeadsModule,
     ApprovalsModule,
     ActivityModule,
     BrainModule,
