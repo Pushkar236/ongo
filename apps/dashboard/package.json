@@ -1,0 +1,26 @@
+{
+  "name": "@ongo/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OnGo Founder Command Center (Next.js)",
+  "scripts": {
+    "dev": "next dev --port 3002",
+    "build": "next build",
+    "start": "next start --port 3002",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "lucide-react": "^0.456.0",
+    "next": "^15.5.19",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.6.3"
+  }
+}

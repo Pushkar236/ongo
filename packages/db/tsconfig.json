@@ -1,0 +1,13 @@
+{
+  "extends": "@ongo/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["src/**/*.ts", "generated/client/index.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}

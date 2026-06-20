@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ongo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ongo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ongo}
+      POSTGRES_DB: ${POSTGRES_DB:-ongo}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ongo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ongo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ongo-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ongo_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # The OnGo Brain. Commented-in for full-container runs; local dev usually runs
+  # the API on the host (pnpm --filter @ongo/api dev) against the two services above.
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: ongo-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ongo}:${POSTGRES_PASSWORD:-ongo}@postgres:5432/${POSTGRES_DB:-ongo}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev_access_secret_change_me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev_refresh_secret_change_me}
+      API_PORT: 3001
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3002}
+    ports:
+      - "3001:3001"
+    profiles:
+      - full
+
+volumes:
+  ongo_pgdata:
+  ongo_redisdata:

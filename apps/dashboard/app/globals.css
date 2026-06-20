@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* OnGo brand tokens — shared visual language with the public site. */
+@theme {
+  --color-ink-950: #020617;
+  --color-ink-900: #0f172a;
+  --color-ink-800: #1e293b;
+  --color-brand-blue: #2563eb;
+  --color-brand-cyan: #06b6d4;
+  --color-brand-purple: #8b5cf6;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background:
+    radial-gradient(60rem 60rem at 80% -10%, rgba(37, 99, 235, 0.12), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 20%, rgba(139, 92, 246, 0.1), transparent 55%),
+    linear-gradient(180deg, #0f172a 0%, #020617 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  color: #e2e8f0;
+}
+
+/* Glassmorphism surface */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, #06b6d4, #2563eb, #8b5cf6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}

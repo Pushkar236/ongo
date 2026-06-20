@@ -1,71 +1,83 @@
-# OnGo — Premium Web Development Agency Website
+# OnGo — AI Business Operating Platform
 
 > **Your Business. Online. OnGo.**
+>
+> A Founder Command Center where one founder operates like a 20-person software
+> agency through specialized AI agents. Agents do the work; the founder makes the
+> decisions. Every action flows through **OnGo Brain**, which enforces
+> human-in-the-loop approvals and an immutable audit trail.
 
-A modern, single-page agency website built with a premium SaaS aesthetic —
-glassmorphism, animated gradients, floating blobs, a custom cursor,
-scroll-triggered motion, and a conversion-focused layout.
+This is a **pnpm + Turborepo monorepo**:
 
-## Tech Stack
+| App / package        | What it is |
+|----------------------|------------|
+| `apps/web`           | Public marketing site + (future) marketplace — Next.js 15 |
+| `apps/dashboard`     | Founder Command Center — Next.js 15, auth-gated |
+| `apps/api`           | **OnGo Brain** — NestJS orchestration backend |
+| `packages/db`        | Prisma schema, client, migrations, seed |
+| `packages/tsconfig`  | Shared TypeScript configs |
 
-- **Next.js 15** (App Router)
-- **TypeScript**
-- **Tailwind CSS** (custom brand theme)
-- **Framer Motion** (animations)
-- **Lucide React** (icons)
+See **[ARCHITECTURE.md](./ARCHITECTURE.md)** for the design and **[ROADMAP.md](./ROADMAP.md)**
+for what's built and what's next.
 
-## Getting Started
+## Prerequisites
+- Node ≥ 20, pnpm ≥ 10, Docker Desktop
+
+## Quick start
 
 ```bash
-npm install
-npm run dev
+# 1. Install
+pnpm install
+
+# 2. Configure env
+cp .env.example .env        # adjust if you already run Postgres on 5432
+
+# 3. Infra
+pnpm docker:up              # Postgres (:5433) + Redis (:6379)
+
+# 4. Database
+pnpm --filter @ongo/db migrate    # apply schema
+pnpm --filter @ongo/db seed       # founder + 7 agents + sample data
+
+# 5. Run the Brain + the Command Center
+pnpm --filter @ongo/api dev        # → http://localhost:3001/api/v1  (Swagger: /api/docs)
+pnpm --filter @ongo/dashboard dev  # → http://localhost:3002
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+**Seeded founder login:** `founder@ongo.ai` / `OnGoFounder!2026`
+
+The public marketing site still runs independently:
 
 ```bash
-npm run build   # production build + typecheck
-npm run start   # serve the production build
+pnpm --filter @ongo/web dev        # → http://localhost:3000
 ```
 
-## Project Structure
+## Try the Brain directly
 
-```
-app/
-  layout.tsx        # fonts, SEO metadata, JSON-LD, cursor + preloader
-  page.tsx          # assembles every section in order
-  globals.css       # Tailwind layers, glass utilities, gradient text, scrollbar
-components/
-  Navbar.tsx        # sticky glass nav, scroll progress, mobile menu
-  Hero.tsx          # headline, CTAs, floating shapes, gradient mesh
-  About.tsx         # mission + 4 feature cards + stats strip
-  Services.tsx      # 6 service cards with hover glow
-  WhyChoose.tsx     # animated stat counters
-  Pricing.tsx       # 3 plans, Business highlighted "Most Popular"
-  Portfolio.tsx     # 6 project cards with hover previews
-  Testimonials.tsx  # 3 client testimonials with ratings
-  Contact.tsx       # validated form + WhatsApp + Send Inquiry
-  Footer.tsx        # logo, links, services, socials, copyright
-  ui/               # reusable primitives (Button, GlassCard, Reveal,
-                    #   SectionHeading, AnimatedCounter, FloatingBlobs,
-                    #   CursorEffect, Preloader)
-lib/
-  data.ts           # services, pricing, portfolio, testimonials, nav
-  site.ts           # brand constants + WhatsApp helper
+```bash
+# Log in
+TOKEN=$(curl -s -X POST http://localhost:3001/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"founder@ongo.ai","password":"OnGoFounder!2026"}' | jq -r .accessToken)
+
+# A high-risk action is BLOCKED until you approve it in the dashboard:
+curl -s -X POST http://localhost:3001/api/v1/brain/actions \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"agentId":"<devops-agent-id>","actionType":"deploy.production"}'
+# → { "status": "pending_approval", ... }
 ```
 
-## Customizing
+## Workspace scripts
+- `pnpm dev` / `pnpm build` / `pnpm lint` / `pnpm test` — Turbo across all apps
+- `pnpm db:migrate` / `pnpm db:seed` / `pnpm db:studio` — database
+- `pnpm docker:up` / `pnpm docker:down` — infra
 
-- **Brand details** (name, tagline, phone, WhatsApp number, email, socials):
-  edit `lib/site.ts`. The WhatsApp number drives every "Chat" / form CTA.
-- **Content** (services, pricing, portfolio, testimonials, nav): edit `lib/data.ts`.
-- **Colors / theme**: edit `tailwind.config.ts` and the CSS variables in `app/globals.css`.
+## Tests
+```bash
+pnpm --filter @ongo/api test     # Brain approval-policy + RBAC unit tests
+```
 
-## Notes
-
-- The contact form has no backend in this build — on submit it opens a
-  pre-filled WhatsApp chat. Wire it to an API route / form service for real leads.
-- All animations respect `prefers-reduced-motion`; the custom cursor disables
-  itself on touch devices.
-- Portfolio previews and avatars use CSS gradients / initials (no external
-  images) to keep the Lighthouse score high and the bundle light.
+## Deployment
+`apps/web` and `apps/dashboard` deploy to Vercel. The API + Postgres + Redis run as
+containers (see `apps/api/Dockerfile` and the `full` profile in `docker-compose.yml`)
+on a container host — not Vercel serverless.

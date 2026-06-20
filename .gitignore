@@ -3,19 +3,36 @@
 /.claude/**
 /.mcp.json
 
-/node_modules
-/.next
-/out
-/build
-.DS_Store
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+.turbo/
+generated/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
 *.pem
-.env*.local
+
+# Vercel
 .vercel
+
+# Test / tooling artifacts
 .playwright-mcp
 qa-*.jpeg
 qa-*.png
+
+# Misc
+.DS_Store
 next-env.d.ts
 *.tsbuildinfo
 npm-debug.log*
-
-.vercel
+*.runtime.log
+ongo-overview.png
