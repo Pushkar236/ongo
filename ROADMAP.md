@@ -13,12 +13,15 @@ Built incrementally, foundation-first. **Phase 1 is complete** (this build).
   Opportunities, Agents — all wired to the live API
 - Swagger/OpenAPI at `/api/docs`; unit tests for the approval policy
 
-## Phase 2 — Real agents (Research → PM)
-- Swap `MockAgentRunner` for an **LLM-backed runner** (Anthropic API, `claude-opus-4-8`)
-- Research Agent: real trend/opportunity analysis → structured `Opportunity` objects
-- Product Manager Agent: PRD + roadmap generation → `Task` breakdown
-- BullMQ on Redis for async agent jobs + retries
-- Agent memory persistence and richer activity context
+## Phase 2 — Real agents (in progress)
+- ✅ **LLM-backed runner** (`AnthropicAgentRunner`, Anthropic API, `claude-opus-4-8`) —
+  the Brain selects it automatically when `ANTHROPIC_API_KEY` is set; falls back to the
+  mock runner otherwise. Per-agent-type personas; tolerant JSON output parsing.
+- ✅ **Materialize**: executed actions now create real records — `research.scan`/
+  `opportunity.create` → Opportunities, `task.create` → Tasks, `deploy.*` → Deployments.
+  The platform visibly "does work" and the dashboard grows from agent runs.
+- ⏳ Next: BullMQ on Redis for async agent jobs + retries; agent memory persistence;
+  richer PM → Developer hand-off; per-agent scoped credentials.
 
 ## Phase 3 — Build agents (Developer / QA / Documentation)
 - Developer Agent: code generation + refactors (sandboxed), PR drafting

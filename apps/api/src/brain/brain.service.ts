@@ -9,9 +9,12 @@ import {
   Approval,
   ApprovalLevel,
   ApprovalStatus,
+  Agent,
+  CompetitionLevel,
   Prisma,
   Role,
 } from "@ongo/db";
+import { AgentRunResult } from "./agent-runner";
 import { PrismaService } from "../prisma/prisma.service";
 import { AgentRunner } from "./agent-runner";
 import { classifyAction } from "./approval-policy";
@@ -115,6 +118,7 @@ export class BrainService {
       actionType: dto.actionType,
       payload,
     });
+    await this.materialize(agent, dto.actionType, result, payload);
 
     let approvalId: string | undefined;
     if (policy.level === ApprovalLevel.SUGGESTED) {
@@ -170,12 +174,87 @@ export class BrainService {
       actionType: approval.actionType,
       payload,
     });
+    await this.materialize(agent, approval.actionType, result, payload);
     await this.log(agent.id, agent.name, approval.actionType, "Approval", approval.id, {
       level: approval.level,
       summary: result.summary,
       approved: true,
     });
     return result;
+  }
+
+  /**
+   * Turn an executed agent action into real records so the platform visibly
+   * "does work": research surfaces opportunities, PMs create tasks, DevOps
+   * records deployments. Best-effort — a failure here never fails the action.
+   */
+  private async materialize(
+    agent: Agent,
+    actionType: string,
+    result: AgentRunResult,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    const out = result.output ?? {};
+    const str = (v: unknown, fallback = "") =>
+      typeof v === "string" && v.trim() ? v.trim() : fallback;
+    const num = (v: unknown, fallback = 0) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+
+    try {
+      if (actionType === "opportunity.create" || actionType === "research.scan") {
+        const comp = str(out.competition, "MEDIUM").toUpperCase();
+        await this.prisma.opportunity.create({
+          data: {
+            title: str(out.opportunity ?? out.title, "New opportunity"),
+            market: str(out.market, "General"),
+            description: str(out.description, result.summary),
+            demandScore: Math.max(0, Math.min(100, Math.round(num(out.demandScore, 60)))),
+            estRevenue: num(out.estRevenue, 0),
+            competition: (["LOW", "MEDIUM", "HIGH"].includes(comp)
+              ? comp
+              : "MEDIUM") as CompetitionLevel,
+            recommendation: str(out.recommendation) || null,
+            sourceAgentId: agent.id,
+          },
+        });
+      } else if (actionType === "task.create") {
+        await this.prisma.task.create({
+          data: {
+            title: str(out.title, result.summary),
+            description: str(out.description) || null,
+            assignedAgentId: agent.id,
+            projectId: str(payload.projectId) || null,
+          } as Prisma.TaskUncheckedCreateInput,
+        });
+      } else if (
+        actionType === "deploy.feature" ||
+        actionType === "deploy.production"
+      ) {
+        const projectId = str(payload.projectId);
+        if (projectId) {
+          await this.prisma.deployment.create({
+            data: {
+              projectId,
+              environment: str(
+                payload.environment,
+                actionType === "deploy.production" ? "production" : "preview",
+              ),
+              status: "LIVE",
+              url: str(out.url) || null,
+              commitSha: str(payload.commitSha) || null,
+              deployedAt: new Date(),
+            },
+          });
+          await this.prisma.project
+            .update({ where: { id: projectId }, data: { deploymentStatus: "LIVE" } })
+            .catch(() => undefined);
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`materialize(${actionType}) failed: ${String(err)}`);
+    }
   }
 
   private impactFor(actionType: string): string {
