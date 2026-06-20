@@ -9,6 +9,7 @@ import {
   FolderKanban,
   Lightbulb,
   Bot,
+  Workflow,
   LogOut,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/types";
@@ -16,6 +17,7 @@ import type { SessionUser } from "@/lib/types";
 const NAV = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/approvals", label: "Approval Center", icon: ShieldCheck },
+  { href: "/workflows", label: "Workflows", icon: Workflow },
   { href: "/activity", label: "Agent Activity", icon: Activity },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/opportunities", label: "Opportunities", icon: Lightbulb },

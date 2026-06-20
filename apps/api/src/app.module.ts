@@ -13,6 +13,7 @@ import { OpportunitiesModule } from "./opportunities/opportunities.module";
 import { ApprovalsModule } from "./approvals/approvals.module";
 import { ActivityModule } from "./activity/activity.module";
 import { BrainModule } from "./brain/brain.module";
+import { WorkflowsModule } from "./workflows/workflows.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { HealthController } from "./health/health.controller";
 
@@ -39,6 +40,7 @@ import { AuditInterceptor } from "./common/interceptors/audit.interceptor";
     ApprovalsModule,
     ActivityModule,
     BrainModule,
+    WorkflowsModule,
     DashboardModule,
   ],
   controllers: [HealthController],

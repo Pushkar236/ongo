@@ -61,6 +61,28 @@ export interface Project {
   _count?: { tasks: number; deployments: number };
 }
 
+export interface Pipeline {
+  key: string;
+  name: string;
+  description: string;
+  steps: number;
+}
+
+export interface WorkflowRun {
+  id: string;
+  name: string;
+  description?: string | null;
+  status: string;
+  trigger?: string | null;
+  steps: Array<{
+    agentType: string;
+    actionType: string;
+    status: string;
+    summary?: string;
+  }>;
+  createdAt: string;
+}
+
 export interface Opportunity {
   id: string;
   title: string;

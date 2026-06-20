@@ -26,7 +26,10 @@ export async function POST(req: Request) {
     sameSite: "lax",
     secure,
     path: "/",
-    maxAge: 60 * 60, // 1h (access token lives ~15m; cookie outlives for refresh UX)
+    // Align the cookie lifetime with the access-token TTL (~15m). If it outlived
+    // the JWT, a present-but-expired token would loop between the auth-gated
+    // layout and the middleware. (Refresh-token rotation is a Phase-4 item.)
+    maxAge: 60 * 15,
   });
   response.cookies.set(REFRESH_COOKIE, data.refreshToken, {
     httpOnly: true,

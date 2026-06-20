@@ -16,13 +16,10 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Already signed in → bounce away from the login page.
-  if (token && pathname === "/login") {
-    const url = req.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
-  }
-
+  // Note: we intentionally do NOT bounce a token-bearing request away from
+  // /login. The token here is unverified (middleware can't check the JWT
+  // signature/expiry), so bouncing would loop with the layout's /auth/me
+  // check whenever the token is present but expired. /login is always reachable.
   return NextResponse.next();
 }
 
