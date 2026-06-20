@@ -28,6 +28,8 @@ generated/
 .playwright-mcp
 qa-*.jpeg
 qa-*.png
+wf*.png
+*.runtime.log
 
 # Misc
 .DS_Store
