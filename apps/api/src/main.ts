@@ -7,7 +7,8 @@ import { AppModule } from "./app.module";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
 
-  app.setGlobalPrefix("api/v1");
+  // Everything lives under /api/v1 except the bare-root signpost route.
+  app.setGlobalPrefix("api/v1", { exclude: ["/"] });
 
   const corsOrigins = (
     process.env.CORS_ORIGINS ?? "http://localhost:3000,http://localhost:3002"

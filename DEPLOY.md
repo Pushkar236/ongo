@@ -5,7 +5,7 @@ the stack and the exact steps.
 
 ```
  Neon (free Postgres)  ──►  Render (free web service, Docker)  ◄── UptimeRobot
-        DATABASE_URL              runs apps/api + autonomy loop      pings /health
+      DATABASE_URL              runs apps/api + autonomy loop      pings /health
                                                                      every 5 min
 ```
 

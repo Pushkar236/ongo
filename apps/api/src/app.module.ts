@@ -19,6 +19,7 @@ import { GithubModule } from "./github/github.module";
 import { AutonomyModule } from "./autonomy/autonomy.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { HealthController } from "./health/health.controller";
+import { RootController } from "./health/root.controller";
 
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { RolesGuard } from "./common/guards/roles.guard";
@@ -49,7 +50,7 @@ import { AuditInterceptor } from "./common/interceptors/audit.interceptor";
     AutonomyModule,
     DashboardModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, RootController],
   providers: [
     // Order matters: rate-limit → authenticate → authorize.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
