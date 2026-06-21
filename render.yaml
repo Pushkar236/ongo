@@ -25,6 +25,15 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY # real sk-ant-api… to run live agents (else mock)
         sync: false
+      # FREE live agents (no billing): set these three to a Groq/Gemini/etc key.
+      - key: LLM_PROVIDER
+        sync: false
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
       - key: GITHUB_TOKEN # PAT for repo maintenance (optional)
         sync: false
       - key: GITHUB_REPOS # owner/repo,owner/repo (optional)

@@ -2,6 +2,7 @@ import { Logger, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AgentRunner, MockAgentRunner } from "./agent-runner";
 import { AnthropicAgentRunner } from "./anthropic-agent-runner";
+import { OpenAiCompatibleAgentRunner } from "./openai-agent-runner";
 import { BrainController } from "./brain.controller";
 import { BrainService } from "./brain.service";
 
@@ -18,27 +19,49 @@ import { BrainService } from "./brain.service";
         const model =
           config.get<string>("AGENT_MODEL")?.trim() || "claude-opus-4-8";
 
-        // Refuse OAuth/session tokens (sk-ant-oat…) — those belong to Claude
-        // Code / claude.ai subscriptions and must NOT power a backend app
-        // (terms-of-service violation + account risk). Accept only real,
-        // metered API keys (sk-ant-api…).
+        // 1) Real metered Anthropic key.
+        if (apiKey && apiKey.startsWith("sk-ant-api")) {
+          Logger.log(`Agents: LLM-backed via Anthropic (${model})`, "BrainModule");
+          return new AnthropicAgentRunner(apiKey, model);
+        }
+
+        // 2) ANY OpenAI-compatible provider — this is the FREE path. Set
+        //    LLM_BASE_URL + LLM_API_KEY + LLM_MODEL to use Groq, Google Gemini,
+        //    OpenRouter, Together, a local Ollama, etc. No Anthropic billing.
+        const llmKey = config.get<string>("LLM_API_KEY")?.trim();
+        const llmBase = config.get<string>("LLM_BASE_URL")?.trim();
+        const llmModel = config.get<string>("LLM_MODEL")?.trim();
+        const llmProvider =
+          config.get<string>("LLM_PROVIDER")?.trim() || "openai-compatible";
+        if (llmKey && llmBase && llmModel) {
+          Logger.log(
+            `Agents: LLM-backed via ${llmProvider} (${llmModel})`,
+            "BrainModule",
+          );
+          return new OpenAiCompatibleAgentRunner(
+            llmKey,
+            llmModel,
+            llmBase,
+            llmProvider,
+          );
+        }
+
+        // 3) Reject OAuth/subscription tokens (sk-ant-oat…) — they belong to
+        //    Claude Code / claude.ai and must NOT power a backend app.
         if (apiKey && apiKey.startsWith("sk-ant-oat")) {
           Logger.warn(
-            "Agents: ignoring ANTHROPIC_API_KEY — it is an OAuth/subscription " +
-              "token (sk-ant-oat…), not an API key. Using mock runner. " +
-              "Provide a real API key (sk-ant-api…) from console.anthropic.com.",
+            "Agents: ignoring ANTHROPIC_API_KEY — it is a subscription token " +
+              "(sk-ant-oat…), not an API key. Using mock. For free live agents " +
+              "set LLM_BASE_URL + LLM_API_KEY + LLM_MODEL (e.g. Groq/Gemini).",
             "BrainModule",
           );
           return new MockAgentRunner();
         }
 
-        if (apiKey && apiKey.startsWith("sk-ant-api")) {
-          Logger.log(`Agents: LLM-backed (${model})`, "BrainModule");
-          return new AnthropicAgentRunner(apiKey, model);
-        }
-
+        // 4) No provider configured → deterministic mock.
         Logger.log(
-          "Agents: mock runner (set a real ANTHROPIC_API_KEY for live execution)",
+          "Agents: mock runner (set LLM_* for free live execution, or a real " +
+            "sk-ant-api key)",
           "BrainModule",
         );
         return new MockAgentRunner();
