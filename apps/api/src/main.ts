@@ -39,8 +39,9 @@ async function bootstrap() {
     swaggerOptions: { persistAuthorization: true },
   });
 
-  const port = Number(process.env.API_PORT ?? 3001);
-  await app.listen(port);
+  // Hosts like Render/Railway/Fly inject $PORT; bind 0.0.0.0 so it's reachable.
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
+  await app.listen(port, "0.0.0.0");
   Logger.log(
     `OnGo Brain → http://localhost:${port}/api/v1  (Swagger: /api/docs)`,
     "Bootstrap",

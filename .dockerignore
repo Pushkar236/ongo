@@ -1,0 +1,16 @@
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+packages/db/generated
+.git
+.env
+.env.*
+!.env.example
+**/*.log
+**/*.runtime.log
+**/*.runtime.err.log
+apps/web
+apps/dashboard
+.playwright-mcp
+*.png

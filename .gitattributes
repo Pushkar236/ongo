@@ -1,0 +1,4 @@
+# Shell scripts must use LF or they break on Linux container hosts (Render).
+*.sh text eol=lf
+scripts/start.sh text eol=lf
+Dockerfile text eol=lf

@@ -1,0 +1,55 @@
+# ─────────────────────────────────────────────────────────────────────────
+# Render Blueprint — free 24/7 host for the OnGo Brain (apps/api).
+# Render dashboard → New → Blueprint → connect this repo. Render reads this file.
+#
+# Database: use a free Neon Postgres (neon.tech) and paste its connection
+# string into DATABASE_URL below (set in the dashboard — it's sync:false).
+# Render's own free Postgres expires; Neon's free tier does not.
+#
+# Keep-alive: the free web service sleeps after ~15 min idle. Point an
+# UptimeRobot HTTP monitor at <service-url>/api/v1/health every 5 min — that
+# traffic keeps it awake so the autonomy engine's interval keeps ticking.
+# ─────────────────────────────────────────────────────────────────────────
+services:
+  - type: web
+    name: ongo-brain
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      # ── Secrets you set in the Render dashboard (sync:false) ──────────────
+      - key: DATABASE_URL # Neon: postgresql://…?sslmode=require
+        sync: false
+      - key: ANTHROPIC_API_KEY # real sk-ant-api… to run live agents (else mock)
+        sync: false
+      - key: GITHUB_TOKEN # PAT for repo maintenance (optional)
+        sync: false
+      - key: GITHUB_REPOS # owner/repo,owner/repo (optional)
+        sync: false
+      - key: CORS_ORIGINS # your dashboard origin(s), comma-separated
+        sync: false
+      - key: SEED_ON_START # set to "true" for the FIRST deploy only, then remove
+        sync: false
+      # ── Generated once, then stable ───────────────────────────────────────
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      # ── Static config ─────────────────────────────────────────────────────
+      - key: NODE_ENV
+        value: production
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: JWT_REFRESH_TTL
+        value: 7d
+      - key: AGENT_MODEL
+        value: claude-opus-4-8
+      - key: AUTONOMY_ENABLED
+        value: "true"
+      - key: AUTONOMY_INTERVAL_MS
+        value: "900000"
+      - key: GITHUB_STALE_DAYS
+        value: "30"
