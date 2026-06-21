@@ -25,6 +25,7 @@ const POLICY: Record<string, ActionPolicy> = {
   "docs.generate": { level: ApprovalLevel.AUTO, riskLevel: RiskLevel.LOW },
   "changelog.update": { level: ApprovalLevel.AUTO, riskLevel: RiskLevel.LOW },
   "test.run": { level: ApprovalLevel.AUTO, riskLevel: RiskLevel.LOW },
+  "github.issue.triage": { level: ApprovalLevel.AUTO, riskLevel: RiskLevel.LOW },
 
   // ── Level 2: suggested (executes, flagged for review) ──────────────
   "project.create": { level: ApprovalLevel.SUGGESTED, riskLevel: RiskLevel.LOW },
@@ -49,6 +50,19 @@ const POLICY: Record<string, ActionPolicy> = {
     level: ApprovalLevel.SUGGESTED,
     riskLevel: RiskLevel.MEDIUM,
   },
+  // GitHub writes are outward-facing → execute but surface for review.
+  "github.issue.comment": {
+    level: ApprovalLevel.SUGGESTED,
+    riskLevel: RiskLevel.MEDIUM,
+  },
+  "github.issue.create": {
+    level: ApprovalLevel.SUGGESTED,
+    riskLevel: RiskLevel.MEDIUM,
+  },
+  "github.pr.review": {
+    level: ApprovalLevel.SUGGESTED,
+    riskLevel: RiskLevel.MEDIUM,
+  },
 
   // ── Level 3: mandatory (blocked until a human approves) ────────────
   "deploy.production": {
@@ -70,6 +84,11 @@ const POLICY: Record<string, ActionPolicy> = {
   "client.communicate": {
     level: ApprovalLevel.MANDATORY,
     riskLevel: RiskLevel.MEDIUM,
+  },
+  // Merging code into a real repo is irreversible-ish → human signs off.
+  "github.pr.merge": {
+    level: ApprovalLevel.MANDATORY,
+    riskLevel: RiskLevel.HIGH,
   },
 };
 

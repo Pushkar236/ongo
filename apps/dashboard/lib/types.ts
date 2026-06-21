@@ -96,6 +96,24 @@ export interface WorkflowRun {
   createdAt: string;
 }
 
+export interface TickReport {
+  at: string;
+  trigger: "auto" | "manual";
+  discovery: { ran: boolean; summary?: string };
+  github: { scanned: boolean; findings: number; tasksOpened: number };
+  errors: string[];
+}
+
+export interface AutonomyStatus {
+  enabled: boolean;
+  running: boolean;
+  intervalMs: number;
+  tickCount: number;
+  lastTickAt?: string;
+  github: { connected: boolean; repos: string[]; staleDays: number };
+  lastReport?: TickReport | null;
+}
+
 export interface Opportunity {
   id: string;
   title: string;

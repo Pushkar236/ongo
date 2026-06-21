@@ -15,6 +15,8 @@ import { ApprovalsModule } from "./approvals/approvals.module";
 import { ActivityModule } from "./activity/activity.module";
 import { BrainModule } from "./brain/brain.module";
 import { WorkflowsModule } from "./workflows/workflows.module";
+import { GithubModule } from "./github/github.module";
+import { AutonomyModule } from "./autonomy/autonomy.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { HealthController } from "./health/health.controller";
 
@@ -43,6 +45,8 @@ import { AuditInterceptor } from "./common/interceptors/audit.interceptor";
     ActivityModule,
     BrainModule,
     WorkflowsModule,
+    GithubModule,
+    AutonomyModule,
     DashboardModule,
   ],
   controllers: [HealthController],

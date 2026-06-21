@@ -11,12 +11,14 @@ import {
   Bot,
   Workflow,
   Inbox,
+  Cpu,
   LogOut,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/types";
 
 const NAV = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/autonomy", label: "Autonomy Engine", icon: Cpu },
   { href: "/approvals", label: "Approval Center", icon: ShieldCheck },
   { href: "/workflows", label: "Workflows", icon: Workflow },
   { href: "/activity", label: "Agent Activity", icon: Activity },
