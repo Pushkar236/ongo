@@ -51,6 +51,15 @@ export class BrainService {
     private readonly runner: AgentRunner,
   ) {}
 
+  /**
+   * Which agent runner is active — "AnthropicAgentRunner" when a real
+   * sk-ant-api key is set, "MockAgentRunner" otherwise. Lets us confirm
+   * live-vs-mock without exposing the key.
+   */
+  runnerKind(): string {
+    return this.runner.constructor.name;
+  }
+
   async dispatch(dto: DispatchActionDto): Promise<DispatchOutcome> {
     const agent = await this.prisma.agent.findUnique({
       where: { id: dto.agentId },

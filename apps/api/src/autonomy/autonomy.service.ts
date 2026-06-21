@@ -89,6 +89,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       intervalMs: this.intervalMs,
       tickCount: this.tickCount,
       lastTickAt: this.lastTickAt,
+      agentRunner: this.brain.runnerKind(),
       github: this.github.status(),
       lastReport: this.lastReport,
     };
