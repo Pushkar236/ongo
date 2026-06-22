@@ -348,4 +348,42 @@ export class GithubService {
       body: JSON.stringify({ title, body }),
     });
   }
+
+  /** Does owner/repo exist? Used to pick a non-colliding name. */
+  async repoExists(fullName: string): Promise<boolean> {
+    try {
+      await this.gh(`/repos/${fullName}`);
+      return true;
+    } catch (err) {
+      if (String(err).includes(" 404 ")) return false;
+      throw err;
+    }
+  }
+
+  /**
+   * Create a new repo under the authenticated user. Private by default — an
+   * auto-incubated project must not land on the public profile until the
+   * founder is happy with it (then flipping it public flows it to the
+   * showcase). auto_init gives an initial commit so files can be written.
+   */
+  async createRepo(
+    name: string,
+    description: string,
+    opts?: { private?: boolean; homepage?: string },
+  ): Promise<{ fullName: string; htmlUrl: string }> {
+    const data = await this.gh<{ full_name: string; html_url: string }>(
+      `/user/repos`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          description: (description || "").slice(0, 350),
+          private: opts?.private ?? true,
+          auto_init: true,
+          ...(opts?.homepage ? { homepage: opts.homepage } : {}),
+        }),
+      },
+    );
+    return { fullName: data.full_name, htmlUrl: data.html_url };
+  }
 }

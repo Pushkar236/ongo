@@ -23,6 +23,16 @@ export class AutonomyController {
     return this.autonomy.tick("manual");
   }
 
+  @ApiOperation({
+    summary: "Incubate one new project now — turns a discovered opportunity " +
+      "into a fresh (private) GitHub repo + Project.",
+  })
+  @Roles(Role.FOUNDER, Role.ADMIN)
+  @Post("incubate")
+  incubate() {
+    return this.autonomy.incubateOnce();
+  }
+
   @ApiOperation({ summary: "Start the 24/7 engine." })
   @Roles(Role.FOUNDER, Role.ADMIN)
   @Post("start")

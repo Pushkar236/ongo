@@ -60,6 +60,12 @@ services:
         value: "true"
       - key: AUTONOMY_INTERVAL_MS
         value: "900000"
+      # Auto-incubate new repos from discovered ideas (private until you publish).
+      # Off by default; trigger manually via POST /autonomy/incubate, or set true.
+      - key: AUTONOMY_INCUBATOR
+        value: "false"
+      - key: AUTONOMY_INCUBATOR_MAX
+        value: "3"
       - key: GITHUB_STALE_DAYS
         value: "30"
       # Public showcase: sync this GitHub user's public repos onto the website.

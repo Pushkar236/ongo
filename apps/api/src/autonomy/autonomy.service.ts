@@ -23,6 +23,7 @@ export interface TickReport {
     updated: number;
   };
   profile: { attempted: boolean; updated: boolean; reason?: string };
+  incubator: { ran: boolean; created: boolean; repo?: string; reason?: string };
   errors: string[];
 }
 
@@ -49,6 +50,10 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
   private tickCount = 0;
   private lastTickAt?: string;
   private lastReport?: TickReport;
+  // Project incubator: auto-create repos from discovered ideas. Off by default
+  // (opt in with AUTONOMY_INCUBATOR=true) and capped so it can't run away.
+  private readonly incubatorEnabled: boolean;
+  private readonly incubatorMax: number;
 
   constructor(
     private readonly config: ConfigService,
@@ -60,6 +65,9 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
     this.enabled = flag === "true" || flag === "1" || flag === "yes";
     this.intervalMs =
       Number(config.get("AUTONOMY_INTERVAL_MS")) || 15 * 60 * 1000;
+    const inc = (config.get<string>("AUTONOMY_INCUBATOR") ?? "").toLowerCase();
+    this.incubatorEnabled = inc === "true" || inc === "1" || inc === "yes";
+    this.incubatorMax = Number(config.get("AUTONOMY_INCUBATOR_MAX")) || 3;
   }
 
   onModuleInit() {
@@ -106,6 +114,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       agentRunner: this.brain.runnerKind(),
       llm: this.llmDiagnostics(),
       github: this.github.status(),
+      incubator: { enabled: this.incubatorEnabled, max: this.incubatorMax },
       lastReport: this.lastReport,
     };
   }
@@ -148,6 +157,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
           github: { scanned: false, findings: 0, tasksOpened: 0 },
           showcase: { synced: false, repos: 0, featured: 0, created: 0, updated: 0 },
           profile: { attempted: false, updated: false },
+          incubator: { ran: false, created: false },
           errors: ["tick already running"],
         }
       );
@@ -160,6 +170,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       github: { scanned: false, findings: 0, tasksOpened: 0 },
       showcase: { synced: false, repos: 0, featured: 0, created: 0, updated: 0 },
       profile: { attempted: false, updated: false },
+      incubator: { ran: false, created: false },
       errors: [],
     };
 
@@ -168,6 +179,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       await this.runGithubMaintenance(report);
       await this.runShowcaseSync(report);
       await this.runProfileSync(report);
+      await this.runProjectIncubator(report);
       await this.heartbeat(report);
     } catch (err) {
       report.errors.push(String(err));
@@ -476,6 +488,188 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       );
     }
     return `${existing.trimEnd()}\n\n${block}\n`;
+  }
+
+  /** Founder-triggered single incubation (bypasses the auto flag). */
+  async incubateOnce(): Promise<TickReport["incubator"]> {
+    const report = {
+      incubator: { ran: false, created: false },
+      errors: [],
+    } as unknown as TickReport;
+    await this.runProjectIncubator(report, true);
+    return report.incubator;
+  }
+
+  /**
+   * Incubator: turn a discovered opportunity into a real, brand-new GitHub repo
+   * (private by default) with a structured README, registered as a Project.
+   * Auto-runs only when AUTONOMY_INCUBATOR=true (else it's manual-trigger only),
+   * capped at AUTONOMY_INCUBATOR_MAX, and routed through the Brain for audit.
+   */
+  private async runProjectIncubator(report: TickReport, force = false) {
+    if (!this.github.configured()) {
+      report.incubator.reason = "no GITHUB_TOKEN";
+      return;
+    }
+    if (!force && !this.incubatorEnabled) return; // opt-in for autonomous runs
+    const user = this.github.showcaseUserName();
+    if (!user) {
+      report.incubator.reason = "no GITHUB_USER";
+      return;
+    }
+    report.incubator.ran = true;
+    try {
+      const incubatedCount = await this.prisma.project.count({
+        where: { source: "incubated" },
+      });
+      if (incubatedCount >= this.incubatorMax) {
+        report.incubator.reason = `cap reached (${this.incubatorMax})`;
+        return;
+      }
+
+      const opp = await this.prisma.opportunity.findFirst({
+        where: { status: { in: ["NEW", "REVIEWING"] } },
+        orderBy: [{ demandScore: "desc" }, { createdAt: "desc" }],
+      });
+      if (!opp) {
+        report.incubator.reason = "no opportunity to incubate";
+        return;
+      }
+
+      // Pick a name free on BOTH GitHub and our Project slugs, with a final
+      // guard so we never try to create over a taken name (which would orphan
+      // a repo and leave the opportunity to retry).
+      const baseSlug = this.slugify(opp.title).slice(0, 80) || "ongo-project";
+      let name = baseSlug;
+      let taken = await this.nameTaken(user, name);
+      for (let i = 2; i <= 10 && taken; i++) {
+        name = `${baseSlug}-${i}`;
+        taken = await this.nameTaken(user, name);
+      }
+      if (taken) {
+        report.incubator.reason = "no available repo name";
+        return;
+      }
+
+      const pm = await this.prisma.agent.findFirst({
+        where: { type: "PRODUCT_MANAGER" },
+      });
+      if (!pm) {
+        report.incubator.reason = "no product agent";
+        return;
+      }
+      await this.ensurePermissions(pm.id, pm.permissions, [
+        "github.repo.create",
+      ]);
+
+      const outcome = await this.brain.dispatch({
+        agentId: pm.id,
+        actionType: "github.repo.create",
+        title: `Incubate project: ${opp.title}`,
+        payload: { repo: name, opportunityId: opp.id },
+      });
+      if (outcome.status !== "executed") {
+        report.incubator.reason = "blocked by approval policy";
+        return;
+      }
+
+      const tech = ["TypeScript", "Next.js", "Tailwind CSS", "Node.js"];
+      const created = await this.github.createRepo(name, opp.description ?? opp.title, {
+        private: true,
+      });
+      const readme = this.buildProjectReadme(opp, tech);
+      const existing = await this.github.getFile(created.fullName, "README.md");
+      await this.github.putFile(
+        created.fullName,
+        "README.md",
+        readme,
+        "docs: project brief (OnGo incubator)",
+        existing?.sha,
+      );
+
+      // Register as a Project. Kept internal (featured=false) while private;
+      // when the founder makes the repo public, the showcase sync features it.
+      // upsert (not create) so a slug clash can never throw and orphan the repo.
+      const projectData = {
+        name,
+        description: opp.description ?? opp.title,
+        status: "ACTIVE" as const,
+        type: "SAAS" as const,
+        repoUrl: created.htmlUrl,
+        tech,
+        featured: false,
+        source: "incubated",
+        pushedAt: new Date(),
+        lastSyncedAt: new Date(),
+      };
+      await this.prisma.project.upsert({
+        where: { slug: name },
+        create: { slug: name, ...projectData },
+        update: projectData,
+      });
+      await this.prisma.opportunity.update({
+        where: { id: opp.id },
+        data: { status: "CONVERTED" },
+      });
+
+      report.incubator.created = true;
+      report.incubator.repo = created.fullName;
+    } catch (err) {
+      report.errors.push(`incubator: ${String(err)}`);
+      report.incubator.reason = String(err).slice(0, 140);
+    }
+  }
+
+  /** A name is unavailable if a GitHub repo OR an existing Project slug uses it. */
+  private async nameTaken(user: string, name: string): Promise<boolean> {
+    if (await this.github.repoExists(`${user}/${name}`)) return true;
+    const p = await this.prisma.project.findUnique({
+      where: { slug: name },
+      select: { id: true },
+    });
+    return Boolean(p);
+  }
+
+  /** Structured project brief for a freshly incubated repo. */
+  private buildProjectReadme(
+    opp: {
+      title: string;
+      market: string;
+      description: string | null;
+      demandScore: number;
+      recommendation: string | null;
+    },
+    tech: string[],
+  ): string {
+    return [
+      `# ${opp.title}`,
+      "",
+      `> ${opp.description ?? opp.recommendation ?? opp.title}`,
+      "",
+      "🚀 **Status:** Incubating — auto-generated by [OnGo](https://ongo-mauve.vercel.app) from a discovered market opportunity.",
+      "",
+      "## 📌 Problem",
+      opp.description ?? "See the opportunity brief.",
+      "",
+      "## 💡 Proposed Solution",
+      opp.recommendation ?? "A focused MVP addressing the problem above.",
+      "",
+      "## 🎯 Market",
+      `${opp.market} · demand score ${opp.demandScore}/100`,
+      "",
+      "## 🧩 Planned Features",
+      "- [ ] Core MVP workflow",
+      "- [ ] User onboarding & auth",
+      "- [ ] Dashboard / analytics",
+      "- [ ] Key integrations",
+      "",
+      "## 🛠 Tech Stack",
+      tech.map((t) => `- ${t}`).join("\n"),
+      "",
+      "---",
+      "<sub>🤖 Auto-incubated by OnGo from an opportunity surfaced by the Research agent. Make this repo public when ready and it appears on the OnGo showcase automatically.</sub>",
+      "",
+    ].join("\n");
   }
 
   private async heartbeat(report: TickReport) {

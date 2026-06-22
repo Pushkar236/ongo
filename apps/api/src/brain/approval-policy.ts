@@ -68,6 +68,13 @@ const POLICY: Record<string, ActionPolicy> = {
     level: ApprovalLevel.SUGGESTED,
     riskLevel: RiskLevel.LOW,
   },
+  // Spin up a new repo from a discovered idea. Private by default + flag-gated,
+  // so it executes-and-logs rather than blocking, but never lands publicly
+  // until the founder makes it public.
+  "github.repo.create": {
+    level: ApprovalLevel.SUGGESTED,
+    riskLevel: RiskLevel.MEDIUM,
+  },
 
   // ── Level 3: mandatory (blocked until a human approves) ────────────
   "deploy.production": {
