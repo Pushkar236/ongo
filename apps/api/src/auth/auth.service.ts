@@ -30,10 +30,29 @@ export class AuthService {
         email: dto.email,
         name: dto.name,
         passwordHash,
-        role: dto.role ?? Role.OPERATOR,
+        // Self-registration is ALWAYS an operator. Role elevation is privileged.
+        role: Role.OPERATOR,
       },
     });
     return this.issueSession(user);
+  }
+
+  /** Authenticated password change — verifies the current password first. */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!ok) throw new UnauthorizedException("Current password is incorrect");
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+    return { ok: true };
   }
 
   async login(dto: LoginDto) {

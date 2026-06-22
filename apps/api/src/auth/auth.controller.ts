@@ -7,7 +7,12 @@ import {
 } from "../common/decorators/current-user.decorator";
 import { Public } from "../common/decorators/public.decorator";
 import { AuthService } from "./auth.service";
-import { LoginDto, RefreshDto, RegisterDto } from "./dto/auth.dto";
+import {
+  ChangePasswordDto,
+  LoginDto,
+  RefreshDto,
+  RegisterDto,
+} from "./dto/auth.dto";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -38,5 +43,18 @@ export class AuthController {
   @Get("me")
   me(@CurrentUser() user: AuthUser) {
     return this.auth.me(user.id);
+  }
+
+  @ApiBearerAuth()
+  @Post("change-password")
+  changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.auth.changePassword(
+      user.id,
+      dto.currentPassword,
+      dto.newPassword,
+    );
   }
 }

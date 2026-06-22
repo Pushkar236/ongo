@@ -1,12 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import {
-  IsEmail,
-  IsEnum,
-  IsOptional,
-  IsString,
-  MinLength,
-} from "class-validator";
-import { Role } from "@ongo/db";
+import { IsEmail, IsString, MinLength } from "class-validator";
 
 export class RegisterDto {
   @ApiProperty({ example: "operator@ongo.ai" })
@@ -22,11 +15,20 @@ export class RegisterDto {
   @IsString()
   @MinLength(8)
   password!: string;
+  // NOTE: no `role` here on purpose — self-registration must never let a
+  // caller choose its own role. Public sign-ups are always OPERATOR; elevation
+  // is a privileged, server-side action.
+}
 
-  @ApiProperty({ enum: Role, required: false, default: Role.OPERATOR })
-  @IsOptional()
-  @IsEnum(Role)
-  role?: Role;
+export class ChangePasswordDto {
+  @ApiProperty({ example: "OnGoFounder!2026" })
+  @IsString()
+  currentPassword!: string;
+
+  @ApiProperty({ example: "my-new-strong-passphrase" })
+  @IsString()
+  @MinLength(10)
+  newPassword!: string;
 }
 
 export class LoginDto {
