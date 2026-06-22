@@ -25,17 +25,25 @@ const API_BASE = (
 ).replace(/\/+$/, "");
 
 export async function getShowcaseProjects(): Promise<ShowcaseProject[]> {
-  try {
-    const res = await fetch(`${API_BASE}/projects/showcase`, {
-      // Re-fetch hourly (ISR) so new repos appear without a redeploy.
-      next: { revalidate: 3600 },
-      // Don't hang the build if the free backend is cold-starting.
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return [];
-    const data = (await res.json()) as unknown;
-    return Array.isArray(data) ? (data as ShowcaseProject[]) : [];
-  } catch {
-    return [];
+  // The free backend (Render) can cold-start slowly. Try twice: the first
+  // attempt wakes it if asleep, the second gets the data. Re-fetch every 15
+  // min (ISR) so the live site self-heals and new repos appear without a
+  // redeploy. Falls back to the built-in examples only if both attempts fail.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}/projects/showcase`, {
+        next: { revalidate: 900 },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as unknown;
+        if (Array.isArray(data) && data.length > 0) {
+          return data as ShowcaseProject[];
+        }
+      }
+    } catch {
+      /* cold start / timeout — retry once */
+    }
   }
+  return [];
 }
