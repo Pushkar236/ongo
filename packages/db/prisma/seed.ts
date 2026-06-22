@@ -55,7 +55,13 @@ const AGENTS = [
     type: "DEVOPS" as const,
     role: "DevOps Agent",
     description: "Deployments, monitoring, infrastructure management.",
-    permissions: ["deploy.feature", "deploy.production", "infra.purchase"],
+    permissions: [
+      "deploy.feature",
+      "deploy.production",
+      "infra.purchase",
+      "github.profile.update",
+      "task.create",
+    ],
   },
   {
     name: "Quill",

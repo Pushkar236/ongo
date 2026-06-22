@@ -63,6 +63,11 @@ const POLICY: Record<string, ActionPolicy> = {
     level: ApprovalLevel.SUGGESTED,
     riskLevel: RiskLevel.MEDIUM,
   },
+  // Refreshing your own profile README — outward-facing but reversible.
+  "github.profile.update": {
+    level: ApprovalLevel.SUGGESTED,
+    riskLevel: RiskLevel.LOW,
+  },
 
   // ── Level 3: mandatory (blocked until a human approves) ────────────
   "deploy.production": {

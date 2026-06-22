@@ -22,6 +22,7 @@ export interface TickReport {
     created: number;
     updated: number;
   };
+  profile: { attempted: boolean; updated: boolean; reason?: string };
   errors: string[];
 }
 
@@ -120,6 +121,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
           discovery: { ran: false },
           github: { scanned: false, findings: 0, tasksOpened: 0 },
           showcase: { synced: false, repos: 0, featured: 0, created: 0, updated: 0 },
+          profile: { attempted: false, updated: false },
           errors: ["tick already running"],
         }
       );
@@ -131,6 +133,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       discovery: { ran: false },
       github: { scanned: false, findings: 0, tasksOpened: 0 },
       showcase: { synced: false, repos: 0, featured: 0, created: 0, updated: 0 },
+      profile: { attempted: false, updated: false },
       errors: [],
     };
 
@@ -138,6 +141,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       await this.runDiscovery(report);
       await this.runGithubMaintenance(report);
       await this.runShowcaseSync(report);
+      await this.runProfileSync(report);
       await this.heartbeat(report);
     } catch (err) {
       report.errors.push(String(err));
@@ -193,6 +197,9 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
         where: { type: "DEVOPS" },
       });
       if (!devops) return;
+      await this.ensurePermissions(devops.id, devops.permissions, [
+        "task.create",
+      ]);
 
       const existing = await this.prisma.task.findMany({
         where: { status: { in: ["PENDING", "IN_PROGRESS"] } },
@@ -305,6 +312,146 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       .replace(/(^-|-$)/g, "");
   }
 
+  /**
+   * Idempotently grant an agent the action types it needs. A runtime migration
+   * so the live DB (seeded before these actions existed) gains them without a
+   * reseed. Deny-by-default still holds for everything not listed here.
+   */
+  private async ensurePermissions(
+    agentId: string,
+    current: string[],
+    needed: string[],
+  ): Promise<void> {
+    const missing = needed.filter((p) => !current.includes(p));
+    if (missing.length === 0) return;
+    await this.prisma.agent.update({
+      where: { id: agentId },
+      data: { permissions: { set: [...new Set([...current, ...needed])] } },
+    });
+  }
+
+  /**
+   * Profile sync: keep an auto-curated "Featured Projects" section in the
+   * founder's GitHub profile README (owner/owner repo) in step with the
+   * showcase — so the profile stays strong and consistent on its own. Needs a
+   * token (write). Routed through the Brain (approval + audit); only the
+   * delimited OnGo section is touched, the rest of the README is preserved.
+   */
+  private async runProfileSync(report: TickReport) {
+    if (!this.github.configured()) return; // write needs a token
+    const user = this.github.showcaseUserName();
+    if (!user) return;
+    report.profile.attempted = true;
+    try {
+      const projects = await this.prisma.project.findMany({
+        where: { featured: true },
+        orderBy: [
+          { liveUrl: { sort: "desc", nulls: "last" } },
+          { stars: "desc" },
+          { pushedAt: "desc" },
+        ],
+        take: 8,
+        select: { name: true, repoUrl: true, liveUrl: true, tech: true },
+      });
+      if (projects.length === 0) {
+        report.profile.reason = "no featured projects yet";
+        return;
+      }
+
+      const devops = await this.prisma.agent.findFirst({
+        where: { type: "DEVOPS" },
+      });
+      if (!devops) {
+        report.profile.reason = "no devops agent";
+        return;
+      }
+      // Grant the GitHub-profile permission once (runtime migration so we don't
+      // depend on a reseed of the live database).
+      await this.ensurePermissions(devops.id, devops.permissions, [
+        "github.profile.update",
+      ]);
+
+      const profileRepo = `${user}/${user}`;
+      const outcome = await this.brain.dispatch({
+        agentId: devops.id,
+        actionType: "github.profile.update",
+        title: "Refresh GitHub profile README (Featured Projects)",
+        payload: { repo: profileRepo, projects: projects.length },
+      });
+      if (outcome.status !== "executed") {
+        report.profile.reason = "blocked by approval policy";
+        return;
+      }
+
+      const section = this.buildProfileSection(projects);
+      const existing = await this.github.getFile(profileRepo, "README.md");
+      const base = existing?.content ?? "";
+      const merged = this.mergeManagedSection(base, section);
+      if (existing && merged.trim() === existing.content.trim()) {
+        report.profile.reason = "already up to date";
+        return;
+      }
+      await this.github.putFile(
+        profileRepo,
+        "README.md",
+        merged,
+        "chore: refresh featured projects (OnGo autopilot)",
+        existing?.sha,
+      );
+      report.profile.updated = true;
+    } catch (err) {
+      report.errors.push(`profile: ${String(err)}`);
+      report.profile.reason = String(err).slice(0, 120);
+    }
+  }
+
+  /** Build the OnGo-managed "Featured Projects" markdown block. */
+  private buildProfileSection(
+    projects: Array<{
+      name: string;
+      repoUrl: string | null;
+      liveUrl: string | null;
+      tech: string[];
+    }>,
+  ): string {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = projects
+      .map((p) => {
+        const links = [
+          p.liveUrl ? `[Live](${p.liveUrl})` : null,
+          p.repoUrl ? `[Code](${p.repoUrl})` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        const stack = (p.tech ?? []).slice(0, 3).join(", ") || "—";
+        return `| **${p.name}** | ${stack} | ${links || "—"} |`;
+      })
+      .join("\n");
+    return [
+      "### 🚀 Featured Projects",
+      "",
+      "| Project | Stack | Links |",
+      "| --- | --- | --- |",
+      rows,
+      "",
+      `<sub>↻ Auto-curated by <a href="https://ongo-mauve.vercel.app">OnGo</a> · updated ${today}</sub>`,
+    ].join("\n");
+  }
+
+  /** Replace (or append) the delimited OnGo section, leaving the rest intact. */
+  private mergeManagedSection(existing: string, section: string): string {
+    const START = "<!-- ONGO:START -->";
+    const END = "<!-- ONGO:END -->";
+    const block = `${START}\n${section}\n${END}`;
+    if (existing.includes(START) && existing.includes(END)) {
+      return existing.replace(
+        new RegExp(`${START}[\\s\\S]*${END}`),
+        block,
+      );
+    }
+    return `${existing.trimEnd()}\n\n${block}\n`;
+  }
+
   private async heartbeat(report: TickReport) {
     try {
       await this.prisma.activityLog.create({
@@ -320,6 +467,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
             tasksOpened: report.github.tasksOpened,
             showcaseRepos: report.showcase.repos,
             showcaseFeatured: report.showcase.featured,
+            profileUpdated: report.profile.updated,
             errors: report.errors,
           } as Prisma.InputJsonValue,
         },

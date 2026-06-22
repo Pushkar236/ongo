@@ -116,6 +116,11 @@ export class GithubService {
     return this.showcaseEnabled && Boolean(this.showcaseUser);
   }
 
+  /** The GitHub handle the showcase/profile features operate on. */
+  showcaseUserName(): string | undefined {
+    return this.showcaseUser;
+  }
+
   configuredRepos(): RepoRef[] {
     return this.repos;
   }
@@ -222,20 +227,22 @@ export class GithubService {
    * Pure read. Returns a flat, capped list of findings.
    */
   async maintenanceScan(limit = 12): Promise<MaintenanceFinding[]> {
-    if (!this.configured() || this.repos.length === 0) return [];
+    if (!this.configured()) return [];
+    const repoNames = await this.resolveMaintenanceRepos();
+    if (repoNames.length === 0) return [];
     const findings: MaintenanceFinding[] = [];
     const staleBefore = Date.now() - this.staleDays * 86_400_000;
 
-    for (const ref of this.repos) {
+    for (const fullName of repoNames) {
       try {
         const issues = await this.gh<GhIssue[]>(
-          `/repos/${ref.fullName}/issues?state=open&per_page=50&sort=updated&direction=asc`,
+          `/repos/${fullName}/issues?state=open&per_page=50&sort=updated&direction=asc`,
         );
         for (const it of issues) {
           if (it.pull_request) {
             if (it.draft) continue;
             findings.push({
-              repo: ref.fullName,
+              repo: fullName,
               kind: "open_pr",
               title: `PR #${it.number}: ${it.title}`,
               detail: "Open pull request awaiting review.",
@@ -248,7 +255,7 @@ export class GithubService {
           const stale = new Date(it.updated_at).getTime() < staleBefore;
           if (untriaged) {
             findings.push({
-              repo: ref.fullName,
+              repo: fullName,
               kind: "untriaged_issue",
               title: `Issue #${it.number}: ${it.title}`,
               detail: "Unlabelled issue — needs triage.",
@@ -257,7 +264,7 @@ export class GithubService {
             });
           } else if (stale) {
             findings.push({
-              repo: ref.fullName,
+              repo: fullName,
               kind: "stale_issue",
               title: `Issue #${it.number}: ${it.title}`,
               detail: `No activity in ${this.staleDays}+ days.`,
@@ -267,13 +274,66 @@ export class GithubService {
           }
         }
       } catch (err) {
-        this.logger.warn(`scan ${ref.fullName} failed: ${String(err)}`);
+        this.logger.warn(`scan ${fullName} failed: ${String(err)}`);
       }
     }
     return findings.slice(0, limit);
   }
 
+  /**
+   * Repos to maintain: the explicit GITHUB_REPOS list if set, otherwise the
+   * user's own public repos — so setting just GITHUB_TOKEN enables maintenance
+   * across everything you own without listing each repo by hand.
+   */
+  async resolveMaintenanceRepos(): Promise<string[]> {
+    if (this.repos.length > 0) return this.repos.map((r) => r.fullName);
+    try {
+      const repos = await this.listShowcaseRepos();
+      return repos.map((r) => r.fullName);
+    } catch (err) {
+      this.logger.warn(`resolve maintenance repos failed: ${String(err)}`);
+      return [];
+    }
+  }
+
   // ── Approved write executors (called only after Brain approval) ─────────
+
+  /** Read a file's content + blob sha. Returns null if it doesn't exist. */
+  async getFile(
+    repo: string,
+    path: string,
+  ): Promise<{ sha: string; content: string } | null> {
+    try {
+      const data = await this.gh<{ sha: string; content: string }>(
+        `/repos/${repo}/contents/${path}`,
+      );
+      return {
+        sha: data.sha,
+        content: Buffer.from(data.content, "base64").toString("utf8"),
+      };
+    } catch (err) {
+      if (String(err).includes(" 404 ")) return null;
+      throw err;
+    }
+  }
+
+  /** Create or update a file (pass the existing sha to update). */
+  async putFile(
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    sha?: string,
+  ) {
+    return this.gh(`/repos/${repo}/contents/${path}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        message,
+        content: Buffer.from(content, "utf8").toString("base64"),
+        ...(sha ? { sha } : {}),
+      }),
+    });
+  }
 
   async commentOnIssue(repo: string, issueNumber: number, body: string) {
     return this.gh(`/repos/${repo}/issues/${issueNumber}/comments`, {
