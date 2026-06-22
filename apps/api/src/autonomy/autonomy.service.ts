@@ -234,9 +234,11 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       report.showcase.synced = true;
       report.showcase.repos = repos.length;
 
+      const syncedSlugs: string[] = [];
       for (const r of repos) {
         const slug = this.slugify(r.name);
         if (!slug) continue;
+        syncedSlugs.push(slug);
 
         // A repo earns the public site if it shows real signal.
         const featured = Boolean(
@@ -275,6 +277,21 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
           await this.prisma.project.create({ data: { slug, ...common } });
           report.showcase.created += 1;
         }
+      }
+
+      // Reconcile: any github-synced project that fell out of the current
+      // top-N is no longer featured, so the public showcase stays a clean,
+      // bounded set instead of accumulating stragglers. Guarded so a transient
+      // empty scan never blanks the site.
+      if (syncedSlugs.length > 0) {
+        await this.prisma.project.updateMany({
+          where: {
+            source: "github-sync",
+            featured: true,
+            slug: { notIn: syncedSlugs },
+          },
+          data: { featured: false },
+        });
       }
     } catch (err) {
       report.errors.push(`showcase: ${String(err)}`);
