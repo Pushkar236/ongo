@@ -23,7 +23,14 @@ export class ProjectsService {
   showcase() {
     return this.prisma.project.findMany({
       where: { featured: true },
-      orderBy: [{ stars: "desc" }, { pushedAt: "desc" }],
+      // Lead with projects that have a live demo (most client-impressive),
+      // then by stars, then most-recently pushed. A self-star shouldn't bury
+      // a deployed flagship.
+      orderBy: [
+        { liveUrl: { sort: "desc", nulls: "last" } },
+        { stars: "desc" },
+        { pushedAt: "desc" },
+      ],
       select: {
         id: true,
         name: true,
