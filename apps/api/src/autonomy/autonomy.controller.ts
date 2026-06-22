@@ -1,7 +1,8 @@
-import { Controller, Get, Post } from "@nestjs/common";
+import { Body, Controller, Get, Post } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Role } from "@ongo/db";
 import { Roles } from "../common/decorators/roles.decorator";
+import { AutonomyConfigDto } from "./dto/autonomy-config.dto";
 import { AutonomyService } from "./autonomy.service";
 
 @ApiTags("autonomy")
@@ -31,6 +32,15 @@ export class AutonomyController {
   @Post("incubate")
   incubate() {
     return this.autonomy.incubateOnce();
+  }
+
+  @ApiOperation({
+    summary: "Tune runtime config (e.g. cycle intervalMs). Persists across redeploys.",
+  })
+  @Roles(Role.FOUNDER, Role.ADMIN)
+  @Post("config")
+  config(@Body() dto: AutonomyConfigDto) {
+    return this.autonomy.setConfig(dto);
   }
 
   @ApiOperation({ summary: "Start the 24/7 engine." })

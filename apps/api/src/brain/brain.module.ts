@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { AgentRunner, MockAgentRunner } from "./agent-runner";
 import { AnthropicAgentRunner } from "./anthropic-agent-runner";
 import { OpenAiCompatibleAgentRunner } from "./openai-agent-runner";
+import { FallbackAgentRunner } from "./fallback-agent-runner";
 import { BrainController } from "./brain.controller";
 import { BrainService } from "./brain.service";
 
@@ -11,60 +12,66 @@ import { BrainService } from "./brain.service";
   providers: [
     BrainService,
     {
-      // Real LLM-backed agents when ANTHROPIC_API_KEY is set; mock otherwise.
+      // Build a chain of LLM providers and fall through on rate-limits so the
+      // engine pools several FREE providers. Mock only if none are configured.
       provide: AgentRunner,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const apiKey = config.get<string>("ANTHROPIC_API_KEY")?.trim();
-        const model =
-          config.get<string>("AGENT_MODEL")?.trim() || "claude-opus-4-8";
+        const get = (k: string) => config.get<string>(k)?.trim();
+        const apiKey = get("ANTHROPIC_API_KEY");
+        const model = get("AGENT_MODEL") || "claude-opus-4-8";
 
-        // 1) Real metered Anthropic key.
+        const runners: AgentRunner[] = [];
+        const labels: string[] = [];
+
+        // 1) Real metered Anthropic key (sk-ant-api…) goes first if present.
         if (apiKey && apiKey.startsWith("sk-ant-api")) {
-          Logger.log(`Agents: LLM-backed via Anthropic (${model})`, "BrainModule");
-          return new AnthropicAgentRunner(apiKey, model);
+          runners.push(new AnthropicAgentRunner(apiKey, model));
+          labels.push(`anthropic:${model}`);
         }
 
-        // 2) ANY OpenAI-compatible provider — this is the FREE path. Set
-        //    LLM_BASE_URL + LLM_API_KEY + LLM_MODEL to use Groq, Google Gemini,
-        //    OpenRouter, Together, a local Ollama, etc. No Anthropic billing.
-        const llmKey = config.get<string>("LLM_API_KEY")?.trim();
-        const llmBase = config.get<string>("LLM_BASE_URL")?.trim();
-        const llmModel = config.get<string>("LLM_MODEL")?.trim();
-        const llmProvider =
-          config.get<string>("LLM_PROVIDER")?.trim() || "openai-compatible";
-        if (llmKey && llmBase && llmModel) {
-          Logger.log(
-            `Agents: LLM-backed via ${llmProvider} (${llmModel})`,
-            "BrainModule",
-          );
-          return new OpenAiCompatibleAgentRunner(
-            llmKey,
-            llmModel,
-            llmBase,
-            llmProvider,
-          );
+        // 2) Any number of OpenAI-compatible FREE providers, in priority order:
+        //    LLM_* (primary), then LLM_*_2, LLM_*_3, LLM_*_4. Each needs its own
+        //    API_KEY + BASE_URL + MODEL (e.g. Groq, Gemini, Cerebras, OpenRouter).
+        for (const sfx of ["", "_2", "_3", "_4"]) {
+          const key = get(`LLM_API_KEY${sfx}`);
+          const base = get(`LLM_BASE_URL${sfx}`);
+          const mdl = get(`LLM_MODEL${sfx}`);
+          const provider = get(`LLM_PROVIDER${sfx}`) || "openai-compatible";
+          if (key && base && mdl) {
+            runners.push(new OpenAiCompatibleAgentRunner(key, mdl, base, provider));
+            labels.push(`${provider}:${mdl}`);
+          }
         }
 
-        // 3) Reject OAuth/subscription tokens (sk-ant-oat…) — they belong to
-        //    Claude Code / claude.ai and must NOT power a backend app.
-        if (apiKey && apiKey.startsWith("sk-ant-oat")) {
-          Logger.warn(
-            "Agents: ignoring ANTHROPIC_API_KEY — it is a subscription token " +
-              "(sk-ant-oat…), not an API key. Using mock. For free live agents " +
-              "set LLM_BASE_URL + LLM_API_KEY + LLM_MODEL (e.g. Groq/Gemini).",
-            "BrainModule",
-          );
+        if (runners.length === 0) {
+          if (apiKey && apiKey.startsWith("sk-ant-oat")) {
+            Logger.warn(
+              "Agents: ignoring ANTHROPIC_API_KEY — it is a subscription token " +
+                "(sk-ant-oat…), not an API key. Using mock. For free live agents " +
+                "set LLM_BASE_URL + LLM_API_KEY + LLM_MODEL (e.g. Groq/Gemini).",
+              "BrainModule",
+            );
+          } else {
+            Logger.log(
+              "Agents: mock runner (set LLM_* for free live execution, or a real " +
+                "sk-ant-api key)",
+              "BrainModule",
+            );
+          }
           return new MockAgentRunner();
         }
 
-        // 4) No provider configured → deterministic mock.
+        if (runners.length === 1) {
+          Logger.log(`Agents: LLM-backed via ${labels[0]}`, "BrainModule");
+          return runners[0];
+        }
+
         Logger.log(
-          "Agents: mock runner (set LLM_* for free live execution, or a real " +
-            "sk-ant-api key)",
+          `Agents: ${runners.length} LLM providers (fallback chain): ${labels.join(" -> ")}`,
           "BrainModule",
         );
-        return new MockAgentRunner();
+        return new FallbackAgentRunner(runners, labels);
       },
     },
   ],

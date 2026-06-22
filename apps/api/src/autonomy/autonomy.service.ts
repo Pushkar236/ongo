@@ -106,7 +106,7 @@ const DEV_PLAN: Array<{
 @Injectable()
 export class AutonomyService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AutonomyService.name);
-  private readonly intervalMs: number;
+  private intervalMs: number;
   private enabled: boolean;
   private timer?: NodeJS.Timeout;
   private running = false;
@@ -133,9 +133,39 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
     this.incubatorMax = Number(config.get("AUTONOMY_INCUBATOR_MAX")) || 3;
   }
 
-  onModuleInit() {
+  async onModuleInit() {
+    // A persisted interval (set via POST /autonomy/config) overrides the env,
+    // so cadence survives redeploys without touching the host's env vars.
+    try {
+      const s = await this.prisma.setting.findUnique({
+        where: { key: "autonomy.intervalMs" },
+      });
+      const v = Number(s?.value);
+      if (Number.isFinite(v) && v >= 15000) this.intervalMs = v;
+    } catch {
+      /* settings table not migrated yet — keep env/default */
+    }
     if (this.enabled) this.start();
     else this.logger.log("Autonomy engine idle (AUTONOMY_ENABLED not set).");
+  }
+
+  /** Founder-tunable runtime config; persists across redeploys via Settings. */
+  async setConfig(opts: { intervalMs?: number }) {
+    if (opts.intervalMs != null) {
+      const ms = Math.max(15000, Math.floor(opts.intervalMs));
+      this.intervalMs = ms;
+      await this.prisma.setting.upsert({
+        where: { key: "autonomy.intervalMs" },
+        create: { key: "autonomy.intervalMs", value: String(ms) },
+        update: { value: String(ms) },
+      });
+      if (this.timer) {
+        // Restart the timer so the new interval takes effect immediately.
+        this.stop();
+        this.start();
+      }
+    }
+    return this.status();
   }
 
   onModuleDestroy() {
@@ -191,7 +221,16 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
   private llmDiagnostics() {
     const get = (k: string) => this.config.get<string>(k)?.trim() || "";
     const anth = get("ANTHROPIC_API_KEY");
+    const providers: string[] = [];
+    if (anth.startsWith("sk-ant-api")) providers.push("anthropic");
+    for (const sfx of ["", "_2", "_3", "_4"]) {
+      if (get(`LLM_API_KEY${sfx}`) && get(`LLM_BASE_URL${sfx}`) && get(`LLM_MODEL${sfx}`)) {
+        providers.push(get(`LLM_PROVIDER${sfx}`) || get(`LLM_MODEL${sfx}`));
+      }
+    }
     return {
+      providerCount: providers.length,
+      providers, // ordered fallback chain — work spreads across these
       hasLlmKey: Boolean(get("LLM_API_KEY")),
       hasLlmBase: Boolean(get("LLM_BASE_URL")),
       hasLlmModel: Boolean(get("LLM_MODEL")),

@@ -57,7 +57,10 @@ export class BrainService {
    * live-vs-mock without exposing the key.
    */
   runnerKind(): string {
-    return this.runner.constructor.name;
+    const r = this.runner as { describe?: () => string };
+    return typeof r.describe === "function"
+      ? `FallbackChain[${r.describe()}]`
+      : this.runner.constructor.name;
   }
 
   async dispatch(dto: DispatchActionDto): Promise<DispatchOutcome> {
