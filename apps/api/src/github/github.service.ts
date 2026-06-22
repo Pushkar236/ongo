@@ -200,11 +200,19 @@ export class GithubService {
           pushedAt: r.pushed_at,
         };
       })
-      .sort(
-        (a, b) =>
-          b.stars - a.stars ||
-          new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime(),
-      )
+      // Rank by client-impressiveness, not raw stars: a deployed demo and a
+      // real description matter far more than a self-star. Live-demo'd,
+      // described projects lead; ties break by most-recently pushed.
+      .sort((a, b) => {
+        const score = (r: ShowcaseRepo) =>
+          (r.homepage ? 1000 : 0) +
+          (r.description ? 200 : 0) +
+          Math.min(r.stars, 20) * 10;
+        return (
+          score(b) - score(a) ||
+          new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime()
+        );
+      })
       .slice(0, this.showcaseMax);
   }
 
