@@ -10,8 +10,10 @@ import Testimonials from "@/components/Testimonials";
 import FAQ from "@/components/FAQ";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
+import { getShowcaseProjects } from "@/lib/showcase";
 
-export default function Home() {
+export default async function Home() {
+  const showcase = await getShowcaseProjects();
   return (
     <>
       <Navbar />
@@ -22,7 +24,7 @@ export default function Home() {
         <Services />
         <WhyChoose />
         <Pricing />
-        <Portfolio />
+        <Portfolio items={showcase} />
         <Testimonials />
         <FAQ />
         <Contact />

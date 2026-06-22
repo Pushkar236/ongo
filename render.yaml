@@ -34,9 +34,9 @@ services:
         sync: false
       - key: LLM_MODEL
         sync: false
-      - key: GITHUB_TOKEN # PAT for repo maintenance (optional)
+      - key: GITHUB_TOKEN # PAT for repo maintenance/writes (optional)
         sync: false
-      - key: GITHUB_REPOS # owner/repo,owner/repo (optional)
+      - key: GITHUB_REPOS # owner/repo,owner/repo for maintenance (optional)
         sync: false
       - key: CORS_ORIGINS # your dashboard origin(s), comma-separated
         sync: false
@@ -62,3 +62,11 @@ services:
         value: "900000"
       - key: GITHUB_STALE_DAYS
         value: "30"
+      # Public showcase: sync this GitHub user's public repos onto the website.
+      # Needs NO token (uses the public GitHub API). Change to your handle.
+      - key: GITHUB_USER
+        value: Pushkar236
+      - key: GITHUB_SHOWCASE
+        value: "true"
+      - key: GITHUB_SHOWCASE_MAX
+        value: "12"

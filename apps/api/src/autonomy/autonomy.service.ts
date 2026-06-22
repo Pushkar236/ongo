@@ -15,6 +15,13 @@ export interface TickReport {
   trigger: "auto" | "manual";
   discovery: { ran: boolean; summary?: string };
   github: { scanned: boolean; findings: number; tasksOpened: number };
+  showcase: {
+    synced: boolean;
+    repos: number;
+    featured: number;
+    created: number;
+    updated: number;
+  };
   errors: string[];
 }
 
@@ -24,6 +31,8 @@ export interface TickReport {
  *   1. Discovery  — a Research-agent scan that surfaces a new opportunity.
  *   2. Maintenance — scans the connected GitHub repos and opens tasks for
  *      anything that needs attention (stale issues, open PRs, untriaged).
+ *   3. Showcase    — syncs the founder's public GitHub repos into Projects so
+ *      the live OnGo site auto-displays real shipped work (no token needed).
  *
  * Every action still flows through the Brain, so the approval policy and audit
  * trail apply. "24/7" is only as good as the host: this loop runs while the API
@@ -70,6 +79,10 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
     );
     // Unref so the loop never holds the process open on its own.
     this.timer.unref?.();
+    // Kick one tick shortly after boot so the showcase fills immediately
+    // instead of waiting a full interval after a deploy/restart.
+    const warmup = setTimeout(() => void this.tick("auto"), 4000);
+    warmup.unref?.();
     this.logger.log(
       `Autonomy engine started — tick every ${Math.round(this.intervalMs / 1000)}s.`,
     );
@@ -106,6 +119,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
           trigger,
           discovery: { ran: false },
           github: { scanned: false, findings: 0, tasksOpened: 0 },
+          showcase: { synced: false, repos: 0, featured: 0, created: 0, updated: 0 },
           errors: ["tick already running"],
         }
       );
@@ -116,12 +130,14 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       trigger,
       discovery: { ran: false },
       github: { scanned: false, findings: 0, tasksOpened: 0 },
+      showcase: { synced: false, repos: 0, featured: 0, created: 0, updated: 0 },
       errors: [],
     };
 
     try {
       await this.runDiscovery(report);
       await this.runGithubMaintenance(report);
+      await this.runShowcaseSync(report);
       await this.heartbeat(report);
     } catch (err) {
       report.errors.push(String(err));
@@ -205,6 +221,73 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Showcase sync: pull the founder's public GitHub repos and upsert them as
+   * Projects so the live OnGo site can display real, shipped work — updating
+   * itself every tick. Read-only and token-free. Curated ("manual") projects
+   * are never clobbered; only github-synced rows are managed here.
+   */
+  private async runShowcaseSync(report: TickReport) {
+    if (!this.github.showcaseConfigured()) return;
+    try {
+      const repos = await this.github.listShowcaseRepos();
+      report.showcase.synced = true;
+      report.showcase.repos = repos.length;
+
+      for (const r of repos) {
+        const slug = this.slugify(r.name);
+        if (!slug) continue;
+
+        // A repo earns the public site if it shows real signal.
+        const featured = Boolean(
+          (r.description && r.description.trim()) || r.homepage || r.stars > 0,
+        );
+        if (featured) report.showcase.featured += 1;
+
+        const common = {
+          name: r.name,
+          description: r.description ?? null,
+          repoUrl: r.htmlUrl,
+          liveUrl: r.homepage,
+          tech: r.tech,
+          stars: r.stars,
+          featured,
+          source: "github-sync",
+          pushedAt: new Date(r.pushedAt),
+          lastSyncedAt: new Date(),
+          status: "ACTIVE" as const,
+          type: "INTERNAL" as const,
+          deploymentStatus: (r.homepage ? "LIVE" : "NONE") as
+            | "LIVE"
+            | "NONE",
+        };
+
+        const existing = await this.prisma.project.findUnique({
+          where: { slug },
+          select: { id: true, source: true },
+        });
+        if (existing) {
+          // Don't overwrite a hand-curated project that happens to share a slug.
+          if (existing.source === "manual") continue;
+          await this.prisma.project.update({ where: { slug }, data: common });
+          report.showcase.updated += 1;
+        } else {
+          await this.prisma.project.create({ data: { slug, ...common } });
+          report.showcase.created += 1;
+        }
+      }
+    } catch (err) {
+      report.errors.push(`showcase: ${String(err)}`);
+    }
+  }
+
+  private slugify(s: string): string {
+    return s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+  }
+
   private async heartbeat(report: TickReport) {
     try {
       await this.prisma.activityLog.create({
@@ -218,6 +301,8 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
             discovery: report.discovery.ran,
             githubFindings: report.github.findings,
             tasksOpened: report.github.tasksOpened,
+            showcaseRepos: report.showcase.repos,
+            showcaseFeatured: report.showcase.featured,
             errors: report.errors,
           } as Prisma.InputJsonValue,
         },

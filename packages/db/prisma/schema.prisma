@@ -206,14 +206,27 @@ model Project {
   repoUrl          String?
   deploymentStatus DeploymentStatus @default(NONE)
   revenue          Decimal          @default(0) @db.Decimal(12, 2)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+
+  // ── Public showcase fields (rendered on the OnGo marketing site) ──────
+  tagline      String? // short one-liner for the card
+  liveUrl      String? // deployed/demo URL (GitHub homepage)
+  imageUrl     String? // optional screenshot; null → gradient fallback
+  tech         String[]  @default([]) // language + topics, for badges
+  stars        Int       @default(0)
+  featured     Boolean   @default(false) // only featured projects are public
+  source       String    @default("manual") // manual | github-sync
+  pushedAt     DateTime? // last push on the source repo
+  lastSyncedAt DateTime? // last time the GitHub sync touched this row
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tasks        Task[]
   repositories Repository[]
   deployments  Deployment[]
   revenues     Revenue[]
 
+  @@index([featured])
   @@map("projects")
 }
 

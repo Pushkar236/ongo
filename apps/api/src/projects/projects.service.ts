@@ -16,6 +16,34 @@ export class ProjectsService {
     });
   }
 
+  /**
+   * Public, lean view for the marketing site — only featured projects, and
+   * only the fields safe to expose (no internal tasks/payloads).
+   */
+  showcase() {
+    return this.prisma.project.findMany({
+      where: { featured: true },
+      orderBy: [{ stars: "desc" }, { pushedAt: "desc" }],
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        tagline: true,
+        repoUrl: true,
+        liveUrl: true,
+        imageUrl: true,
+        tech: true,
+        stars: true,
+        status: true,
+        type: true,
+        deploymentStatus: true,
+        pushedAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
   async findOne(id: string) {
     const project = await this.prisma.project.findUnique({
       where: { id },

@@ -33,6 +33,33 @@ interface GhIssue {
   draft?: boolean;
 }
 
+interface GhRepo {
+  name: string;
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  homepage: string | null;
+  language: string | null;
+  topics?: string[];
+  stargazers_count: number;
+  pushed_at: string;
+  fork: boolean;
+  archived: boolean;
+  private: boolean;
+}
+
+/** A public repo, normalized for the OnGo showcase. */
+export interface ShowcaseRepo {
+  name: string;
+  fullName: string;
+  description: string | null;
+  htmlUrl: string;
+  homepage: string | null;
+  tech: string[];
+  stars: number;
+  pushedAt: string;
+}
+
 /**
  * Thin GitHub REST client. Read-only scanning works with any token; write
  * actions (comment / PR / merge) are routed through the OnGo Brain so the
@@ -47,6 +74,11 @@ export class GithubService {
   private readonly token?: string;
   private readonly repos: RepoRef[];
   private readonly staleDays: number;
+  // Public showcase config — works with NO token (public GitHub API).
+  private readonly showcaseUser?: string;
+  private readonly showcaseEnabled: boolean;
+  private readonly showcaseMax: number;
+  private readonly includeForks: boolean;
 
   constructor(config: ConfigService) {
     this.token = config.get<string>("GITHUB_TOKEN")?.trim() || undefined;
@@ -60,10 +92,28 @@ export class GithubService {
         return { owner, repo, fullName };
       })
       .filter((r) => r.owner && r.repo);
+
+    // The GitHub handle whose public repos feed the OnGo showcase. Defaults to
+    // the founder's account so the site lights up with zero configuration.
+    this.showcaseUser =
+      config.get<string>("GITHUB_USER")?.trim() || "Pushkar236";
+    const flag = (config.get<string>("GITHUB_SHOWCASE") ?? "true").toLowerCase();
+    this.showcaseEnabled = flag !== "false" && flag !== "0" && flag !== "no";
+    this.showcaseMax = Number(config.get("GITHUB_SHOWCASE_MAX")) || 12;
+    this.includeForks =
+      (config.get<string>("GITHUB_SHOWCASE_INCLUDE_FORKS") ?? "")
+        .toLowerCase()
+        .trim() === "true";
   }
 
+  /** True when a token is set (required for repo *maintenance* / writes). */
   configured(): boolean {
     return Boolean(this.token);
+  }
+
+  /** The showcase sync needs no token — only a username and the feature on. */
+  showcaseConfigured(): boolean {
+    return this.showcaseEnabled && Boolean(this.showcaseUser);
   }
 
   configuredRepos(): RepoRef[] {
@@ -75,18 +125,33 @@ export class GithubService {
       connected: this.configured(),
       repos: this.repos.map((r) => r.fullName),
       staleDays: this.staleDays,
+      showcaseUser: this.showcaseUser,
+      showcaseEnabled: this.showcaseEnabled,
     };
   }
 
   private async gh<T>(path: string, init?: RequestInit): Promise<T> {
     if (!this.token) throw new Error("GITHUB_TOKEN not configured");
+    return this.request<T>(path, init, this.token);
+  }
+
+  /**
+   * GitHub request with OPTIONAL auth. Uses the token when present (5000
+   * req/hr) but works unauthenticated (60 req/hr) — enough for read-only
+   * public showcase syncs on a 15-minute tick.
+   */
+  private async request<T>(
+    path: string,
+    init: RequestInit | undefined,
+    token: string | undefined,
+  ): Promise<T> {
     const res = await fetch(`https://api.github.com${path}`, {
       ...init,
       headers: {
         Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${this.token}`,
         "X-GitHub-Api-Version": "2022-11-28",
         "User-Agent": "ongo-brain",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -95,6 +160,52 @@ export class GithubService {
       throw new Error(`GitHub ${res.status} ${path}: ${body.slice(0, 200)}`);
     }
     return (await res.json()) as T;
+  }
+
+  /**
+   * List the public repos of the configured GitHub user, normalized for the
+   * showcase. No token required. Forks/archived excluded by default; sorted by
+   * most recently pushed. Throws on network/HTTP error (caller degrades).
+   */
+  async listShowcaseRepos(): Promise<ShowcaseRepo[]> {
+    if (!this.showcaseConfigured()) return [];
+    const repos = await this.request<GhRepo[]>(
+      `/users/${this.showcaseUser}/repos?per_page=100&sort=pushed&type=owner`,
+      undefined,
+      this.token,
+    );
+    const userLower = (this.showcaseUser ?? "").toLowerCase();
+    return repos
+      .filter((r) => !r.private)
+      .filter((r) => this.includeForks || !r.fork)
+      .filter((r) => !r.archived)
+      // Skip the profile README repo (owner/owner) — it's not a project.
+      .filter((r) => r.name.toLowerCase() !== userLower)
+      .map((r) => {
+        const langLower = r.language?.toLowerCase();
+        const tech = [
+          ...(r.language ? [r.language] : []),
+          ...((r.topics ?? []).filter(
+            (t) => t && t.toLowerCase() !== langLower,
+          )),
+        ].slice(0, 6);
+        return {
+          name: r.name,
+          fullName: r.full_name,
+          description: r.description,
+          htmlUrl: r.html_url,
+          homepage: r.homepage && r.homepage.trim() ? r.homepage.trim() : null,
+          tech,
+          stars: r.stargazers_count,
+          pushedAt: r.pushed_at,
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.stars - a.stars ||
+          new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime(),
+      )
+      .slice(0, this.showcaseMax);
   }
 
   /**
