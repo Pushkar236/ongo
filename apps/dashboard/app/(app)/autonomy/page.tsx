@@ -6,6 +6,23 @@ import type { AutonomyStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+// The accurate active provider chain comes from agentRunner (reflects live
+// DB-driven overrides); llm.providers only sees env, so prefer agentRunner.
+function activeProviders(
+  agentRunner?: string,
+  llm?: { providers?: string[] },
+): string[] {
+  if (agentRunner?.startsWith("FallbackChain[")) {
+    return agentRunner
+      .slice("FallbackChain[".length, -1)
+      .split(" -> ")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  if (agentRunner && agentRunner !== "MockAgentRunner") return [agentRunner];
+  return llm?.providers ?? [];
+}
+
 function CycleRow({
   label,
   ok,
@@ -32,6 +49,7 @@ export default async function AutonomyPage() {
   const s = await apiFetch<AutonomyStatus>("/autonomy/status");
   const minutes = Math.round(s.intervalMs / 60000);
   const report = s.lastReport;
+  const providers = activeProviders(s.agentRunner, s.llm);
 
   return (
     <>
@@ -140,9 +158,9 @@ export default async function AutonomyPage() {
             <p className="text-xs text-slate-500">
               Live LLM fallback chain — work rolls to the next on rate-limit.
             </p>
-            {s.llm?.providers && s.llm.providers.length > 0 ? (
+            {providers.length > 0 ? (
               <ol className="mt-3 space-y-1.5">
-                {s.llm.providers.map((p, i) => (
+                {providers.map((p, i) => (
                   <li
                     key={`${p}-${i}`}
                     className="flex items-center gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm text-white"
@@ -153,9 +171,7 @@ export default async function AutonomyPage() {
                 ))}
               </ol>
             ) : (
-              <p className="mt-3 text-sm text-slate-400">
-                {s.agentRunner ?? "mock runner"}
-              </p>
+              <p className="mt-3 text-sm text-slate-400">mock runner</p>
             )}
             <p className="mt-3 text-xs text-slate-500">
               Cycle every {minutes} min ·{" "}
