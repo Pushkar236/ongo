@@ -104,8 +104,34 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       tickCount: this.tickCount,
       lastTickAt: this.lastTickAt,
       agentRunner: this.brain.runnerKind(),
+      llm: this.llmDiagnostics(),
       github: this.github.status(),
       lastReport: this.lastReport,
+    };
+  }
+
+  /**
+   * Why the agents are live vs mock — reports which provider env vars are
+   * present (booleans + non-secret base/model only, never the keys). The
+   * OpenAI-compatible (free) runner needs ALL of LLM_API_KEY + LLM_BASE_URL +
+   * LLM_MODEL; a real Anthropic key (sk-ant-api…) takes precedence.
+   */
+  private llmDiagnostics() {
+    const get = (k: string) => this.config.get<string>(k)?.trim() || "";
+    const anth = get("ANTHROPIC_API_KEY");
+    return {
+      hasLlmKey: Boolean(get("LLM_API_KEY")),
+      hasLlmBase: Boolean(get("LLM_BASE_URL")),
+      hasLlmModel: Boolean(get("LLM_MODEL")),
+      llmBase: get("LLM_BASE_URL") || null,
+      llmModel: get("LLM_MODEL") || null,
+      anthropicKeyKind: anth
+        ? anth.startsWith("sk-ant-api")
+          ? "api"
+          : anth.startsWith("sk-ant-oat")
+            ? "oat(ignored)"
+            : "other"
+        : "none",
     };
   }
 
