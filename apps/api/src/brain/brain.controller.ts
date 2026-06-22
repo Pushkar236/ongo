@@ -4,6 +4,7 @@ import { Role } from "@ongo/db";
 import { Roles } from "../common/decorators/roles.decorator";
 import { BrainService } from "./brain.service";
 import { DispatchActionDto } from "./dto/dispatch-action.dto";
+import { LlmConfigDto } from "./dto/llm-config.dto";
 import { KNOWN_ACTION_TYPES } from "./approval-policy";
 
 @ApiTags("brain")
@@ -25,5 +26,16 @@ export class BrainController {
   @Get("actions/catalog")
   catalog() {
     return { actionTypes: KNOWN_ACTION_TYPES };
+  }
+
+  @ApiOperation({
+    summary:
+      "Switch the LLM provider live (persists across redeploys). Returns the " +
+      "active runner chain.",
+  })
+  @Roles(Role.FOUNDER, Role.ADMIN)
+  @Post("llm")
+  setLlm(@Body() dto: LlmConfigDto) {
+    return this.brain.setLLMConfig(dto);
   }
 }

@@ -3,7 +3,9 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   ActorType,
   Approval,
@@ -16,7 +18,8 @@ import {
 } from "@ongo/db";
 import { AgentRunResult } from "./agent-runner";
 import { PrismaService } from "../prisma/prisma.service";
-import { AgentRunner } from "./agent-runner";
+import { AgentRunner, MockAgentRunner } from "./agent-runner";
+import { buildAgentRunner, LLM_SETTING_PREFIX } from "./build-runner";
 import { classifyAction } from "./approval-policy";
 import { DispatchActionDto } from "./dto/dispatch-action.dto";
 
@@ -43,18 +46,78 @@ export type DispatchOutcome =
  * Every branch writes an immutable activity_log entry.
  */
 @Injectable()
-export class BrainService {
+export class BrainService implements OnModuleInit {
   private readonly logger = new Logger(BrainService.name);
+  // Mutable so the LLM provider can be swapped live (DB-backed, no redeploy).
+  private runner: AgentRunner = new MockAgentRunner();
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly runner: AgentRunner,
+    private readonly config: ConfigService,
   ) {}
 
+  async onModuleInit() {
+    await this.rebuildRunner();
+  }
+
+  /** (Re)build the runner from DB LLM overrides layered over env. */
+  private async rebuildRunner() {
+    const overrides = await this.loadLlmOverrides();
+    this.runner = buildAgentRunner(
+      (k) => overrides[k] ?? this.config.get<string>(k),
+    );
+    this.logger.log(`Agent runner active: ${this.runnerKind()}`);
+  }
+
+  /** DB-stored LLM config (Setting keys "llm.<ENV_NAME>") override env. */
+  private async loadLlmOverrides(): Promise<Record<string, string>> {
+    try {
+      const rows = await this.prisma.setting.findMany({
+        where: { key: { startsWith: LLM_SETTING_PREFIX } },
+      });
+      return Object.fromEntries(
+        rows.map((r) => [r.key.slice(LLM_SETTING_PREFIX.length), r.value]),
+      );
+    } catch {
+      return {}; // settings table not migrated yet
+    }
+  }
+
   /**
-   * Which agent runner is active — "AnthropicAgentRunner" when a real
-   * sk-ant-api key is set, "MockAgentRunner" otherwise. Lets us confirm
-   * live-vs-mock without exposing the key.
+   * Switch the LLM provider live. Persists to the Settings table (survives
+   * redeploys) and rebuilds the runner immediately. Pass a slot suffix
+   * ("", "_2", "_3", "_4") to set a specific position in the fallback chain.
+   */
+  async setLLMConfig(cfg: {
+    provider?: string;
+    baseUrl?: string;
+    apiKey?: string;
+    model?: string;
+    slot?: string;
+  }) {
+    const slot = cfg.slot ?? "";
+    const map: Array<[string, string | undefined]> = [
+      [`LLM_PROVIDER${slot}`, cfg.provider],
+      [`LLM_BASE_URL${slot}`, cfg.baseUrl],
+      [`LLM_API_KEY${slot}`, cfg.apiKey],
+      [`LLM_MODEL${slot}`, cfg.model],
+    ];
+    for (const [envKey, value] of map) {
+      if (value == null) continue;
+      const key = `${LLM_SETTING_PREFIX}${envKey}`;
+      await this.prisma.setting.upsert({
+        where: { key },
+        create: { key, value },
+        update: { value },
+      });
+    }
+    await this.rebuildRunner();
+    return { runner: this.runnerKind() };
+  }
+
+  /**
+   * Which agent runner is active — e.g. "FallbackChain[openrouter:… -> groq:…]"
+   * or "MockAgentRunner". Lets us confirm live-vs-mock without exposing keys.
    */
   runnerKind(): string {
     const r = this.runner as { describe?: () => string };
