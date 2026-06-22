@@ -24,8 +24,71 @@ export interface TickReport {
   };
   profile: { attempted: boolean; updated: boolean; reason?: string };
   incubator: { ran: boolean; created: boolean; repo?: string; reason?: string };
+  development: {
+    ran: boolean;
+    committed: boolean;
+    repo?: string;
+    file?: string;
+    reason?: string;
+  };
   errors: string[];
 }
+
+// The fixed scaffold the development agent builds, one file per cycle. Each
+// step's content is written by the Developer agent (LLM); `fallback` guarantees
+// a real, sensible commit even if the model output is unusable.
+const slug = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+const DEV_PLAN: Array<{
+  path: string;
+  instruction: string;
+  fallback: (name: string, desc: string) => string;
+}> = [
+  {
+    path: ".gitignore",
+    instruction: "Generate a standard Node/TypeScript .gitignore file.",
+    fallback: () =>
+      ["node_modules", "dist", ".next", ".env", ".env.local", "*.log", ".DS_Store", ""].join("\n"),
+  },
+  {
+    path: "package.json",
+    instruction:
+      "Generate a minimal package.json for a TypeScript project: name, version 0.1.0, private true, and dev/build/start scripts.",
+    fallback: (name) =>
+      JSON.stringify(
+        { name: slug(name), version: "0.1.0", private: true, scripts: { dev: "tsx src/index.ts", build: "tsc", start: "node dist/index.js" } },
+        null,
+        2,
+      ) + "\n",
+  },
+  {
+    path: "src/index.ts",
+    instruction:
+      "Write src/index.ts — the TypeScript entry point that wires up and runs the core of the project described.",
+    fallback: (name, desc) =>
+      `// ${name}\n// ${desc}\nimport { core } from "./core";\n\nfunction main() {\n  console.log("[${name}]", core.describe());\n}\n\nmain();\n`,
+  },
+  {
+    path: "src/types.ts",
+    instruction: "Write src/types.ts with TypeScript interfaces for the core domain of this project.",
+    fallback: (name) =>
+      `// Core domain types for ${name}\nexport interface Entity {\n  id: string;\n  createdAt: string;\n}\n`,
+  },
+  {
+    path: "src/core.ts",
+    instruction: "Write src/core.ts — the core business-logic module implementing the project's main feature.",
+    fallback: (name, desc) =>
+      `// Core logic for ${name}\n// ${desc}\nexport const core = {\n  describe() {\n    return "${name}: ${desc.replace(/"/g, "'")}";\n  },\n};\n`,
+  },
+  {
+    path: "docs/ARCHITECTURE.md",
+    instruction:
+      "Write docs/ARCHITECTURE.md describing the planned modules, data flow, and roadmap for this project.",
+    fallback: (name, desc) =>
+      `# ${name} — Architecture\n\n> ${desc}\n\n## Modules\n- \`src/index.ts\` — entry point\n- \`src/core.ts\` — core logic\n- \`src/types.ts\` — domain types\n\n## Roadmap\n- [ ] MVP feature\n- [ ] Tests\n- [ ] CI + deploy\n`,
+  },
+];
 
 /**
  * The always-on engine. On a fixed interval it wakes and drives the platform
@@ -64,7 +127,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
     const flag = (config.get<string>("AUTONOMY_ENABLED") ?? "").toLowerCase();
     this.enabled = flag === "true" || flag === "1" || flag === "yes";
     this.intervalMs =
-      Number(config.get("AUTONOMY_INTERVAL_MS")) || 15 * 60 * 1000;
+      Number(config.get("AUTONOMY_INTERVAL_MS")) || 5 * 60 * 1000;
     const inc = (config.get<string>("AUTONOMY_INCUBATOR") ?? "").toLowerCase();
     this.incubatorEnabled = inc === "true" || inc === "1" || inc === "yes";
     this.incubatorMax = Number(config.get("AUTONOMY_INCUBATOR_MAX")) || 3;
@@ -158,6 +221,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
           showcase: { synced: false, repos: 0, featured: 0, created: 0, updated: 0 },
           profile: { attempted: false, updated: false },
           incubator: { ran: false, created: false },
+          development: { ran: false, committed: false },
           errors: ["tick already running"],
         }
       );
@@ -171,6 +235,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       showcase: { synced: false, repos: 0, featured: 0, created: 0, updated: 0 },
       profile: { attempted: false, updated: false },
       incubator: { ran: false, created: false },
+      development: { ran: false, committed: false },
       errors: [],
     };
 
@@ -180,6 +245,7 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       await this.runShowcaseSync(report);
       await this.runProfileSync(report);
       await this.runProjectIncubator(report);
+      await this.runProjectDevelopment(report);
       await this.heartbeat(report);
     } catch (err) {
       report.errors.push(String(err));
@@ -200,6 +266,18 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
         where: { type: "RESEARCH" },
       });
       if (!research) return;
+      // Stop the pile-up: once there's a healthy backlog of unreviewed
+      // opportunities, skip discovery and let the build agents catch up.
+      const openOpps = await this.prisma.opportunity.count({
+        where: { status: { in: ["NEW", "REVIEWING"] } },
+      });
+      if (openOpps >= 20) {
+        report.discovery = {
+          ran: false,
+          summary: `discovery paused — ${openOpps} opportunities awaiting review`,
+        };
+        return;
+      }
       const outcome = await this.brain.dispatch({
         agentId: research.id,
         actionType: "research.scan",
@@ -672,6 +750,109 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
     ].join("\n");
   }
 
+  /**
+   * Development loop: each cycle the Developer agent builds out ONE incubated
+   * project by generating + committing the next file in the scaffold plan.
+   * Real commits accrue over cycles so projects actually get built (and the
+   * contribution graph stays active). Writes only to PRIVATE incubated repos;
+   * routed through the Brain (code.generate). Needs a token; no-op without one.
+   */
+  private async runProjectDevelopment(report: TickReport) {
+    if (!this.github.configured()) return;
+    try {
+      const project = await this.prisma.project.findFirst({
+        where: {
+          source: "incubated",
+          devStep: { lt: DEV_PLAN.length },
+          repoUrl: { not: null },
+        },
+        orderBy: [{ devStep: "asc" }, { lastSyncedAt: "asc" }],
+      });
+      if (!project) {
+        report.development.reason = "no incubated project needs building";
+        return;
+      }
+      report.development.ran = true;
+
+      const repo = this.repoFullNameFromUrl(project.repoUrl ?? "");
+      if (!repo) {
+        report.development.reason = "unparseable repoUrl";
+        return;
+      }
+      const step = DEV_PLAN[project.devStep];
+
+      const dev = await this.prisma.agent.findFirst({
+        where: { type: "DEVELOPER" },
+      });
+      if (!dev) {
+        report.development.reason = "no developer agent";
+        return;
+      }
+      await this.ensurePermissions(dev.id, dev.permissions, ["code.generate"]);
+
+      // Ask the Developer agent (LLM) to write the file; fall back to a sane
+      // deterministic version so a commit always lands.
+      const outcome = await this.brain.dispatch({
+        agentId: dev.id,
+        actionType: "code.generate",
+        title: `Build ${project.name}: ${step.path}`,
+        payload: {
+          project: project.name,
+          description: project.description ?? "",
+          file: step.path,
+          instruction: step.instruction,
+          note: "Return ONLY the raw file contents in output.content — no markdown fences, no commentary.",
+        },
+      });
+
+      let content = "";
+      if (outcome.status === "executed") {
+        const out = (outcome.result.output ?? {}) as Record<string, unknown>;
+        if (typeof out.content === "string") content = out.content;
+      }
+      content = content.trim();
+      if (content.startsWith("```")) {
+        content = content
+          .replace(/^```[^\n]*\n/, "")
+          .replace(/\n```\s*$/, "")
+          .trim();
+      }
+      if (!content) {
+        content = step.fallback(project.name, project.description ?? "");
+      }
+
+      const existing = await this.github.getFile(repo, step.path);
+      await this.github.putFile(
+        repo,
+        step.path,
+        content.endsWith("\n") ? content : content + "\n",
+        `feat: ${step.path} (OnGo dev agent)`,
+        existing?.sha,
+      );
+
+      await this.prisma.project.update({
+        where: { id: project.id },
+        data: {
+          devStep: { increment: 1 },
+          pushedAt: new Date(),
+          lastSyncedAt: new Date(),
+        },
+      });
+      report.development.committed = true;
+      report.development.repo = repo;
+      report.development.file = step.path;
+    } catch (err) {
+      report.errors.push(`development: ${String(err)}`);
+      report.development.reason = String(err).slice(0, 140);
+    }
+  }
+
+  /** Extract "owner/repo" from a GitHub URL. */
+  private repoFullNameFromUrl(url: string): string | null {
+    const m = url.match(/github\.com\/([^/]+\/[^/]+?)(?:\.git)?\/?$/i);
+    return m ? m[1] : null;
+  }
+
   private async heartbeat(report: TickReport) {
     try {
       await this.prisma.activityLog.create({
@@ -688,6 +869,10 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
             showcaseRepos: report.showcase.repos,
             showcaseFeatured: report.showcase.featured,
             profileUpdated: report.profile.updated,
+            incubatedRepo: report.incubator.repo,
+            developed: report.development.committed
+              ? `${report.development.repo}:${report.development.file}`
+              : null,
             errors: report.errors,
           } as Prisma.InputJsonValue,
         },

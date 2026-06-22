@@ -59,7 +59,7 @@ services:
       - key: AUTONOMY_ENABLED
         value: "true"
       - key: AUTONOMY_INTERVAL_MS
-        value: "900000"
+        value: "300000" # 5-minute cycles
       # Auto-incubate new repos from discovered ideas (private until you publish).
       # Off by default; trigger manually via POST /autonomy/incubate, or set true.
       - key: AUTONOMY_INCUBATOR

@@ -214,9 +214,10 @@ model Project {
   tech         String[]  @default([]) // language + topics, for badges
   stars        Int       @default(0)
   featured     Boolean   @default(false) // only featured projects are public
-  source       String    @default("manual") // manual | github-sync
+  source       String    @default("manual") // manual | github-sync | incubated
   pushedAt     DateTime? // last push on the source repo
   lastSyncedAt DateTime? // last time the GitHub sync touched this row
+  devStep      Int       @default(0) // how many build steps the dev agent has committed
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
