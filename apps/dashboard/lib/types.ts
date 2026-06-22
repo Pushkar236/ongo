@@ -101,6 +101,27 @@ export interface TickReport {
   trigger: "auto" | "manual";
   discovery: { ran: boolean; summary?: string };
   github: { scanned: boolean; findings: number; tasksOpened: number };
+  showcase?: {
+    synced: boolean;
+    repos: number;
+    featured: number;
+    created: number;
+    updated: number;
+  };
+  profile?: { attempted: boolean; updated: boolean; reason?: string };
+  incubator?: {
+    ran: boolean;
+    created: boolean;
+    repo?: string;
+    reason?: string;
+  };
+  development?: {
+    ran: boolean;
+    committed: boolean;
+    repo?: string;
+    file?: string;
+    reason?: string;
+  };
   errors: string[];
 }
 
@@ -110,8 +131,41 @@ export interface AutonomyStatus {
   intervalMs: number;
   tickCount: number;
   lastTickAt?: string;
+  agentRunner?: string;
+  llm?: {
+    providerCount?: number;
+    providers?: string[];
+    primaryModel?: string | null;
+  };
   github: { connected: boolean; repos: string[]; staleDays: number };
+  incubator?: { enabled: boolean; max: number };
   lastReport?: TickReport | null;
+}
+
+export interface AgentAnalytics {
+  summary: {
+    totalAgentActions: number;
+    opportunities: number;
+    projects: number;
+    incubatedRepos: number;
+    devCommits: number;
+  };
+  agents: Array<{
+    id: string;
+    name: string;
+    type: string;
+    role: string;
+    status: string;
+    description?: string | null;
+    lastActiveAt?: string | null;
+    totalActions: number;
+    actionsByType: Array<{ action: string; count: number }>;
+    recentActions: Array<{
+      action: string;
+      entity?: string | null;
+      createdAt: string;
+    }>;
+  }>;
 }
 
 export interface Opportunity {

@@ -6,6 +6,28 @@ import type { AutonomyStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+function CycleRow({
+  label,
+  ok,
+  text,
+}: {
+  label: string;
+  ok: boolean;
+  text?: string;
+}) {
+  return (
+    <li className="flex items-start justify-between gap-3">
+      <span className="flex items-center gap-2 text-slate-400">
+        <span
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${ok ? "bg-emerald-400" : "bg-slate-600"}`}
+        />
+        {label}
+      </span>
+      <span className="min-w-0 text-right text-white">{text || "—"}</span>
+    </li>
+  );
+}
+
 export default async function AutonomyPage() {
   const s = await apiFetch<AutonomyStatus>("/autonomy/status");
   const minutes = Math.round(s.intervalMs / 60000);
@@ -47,7 +69,9 @@ export default async function AutonomyPage() {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <Card>
-          <h2 className="mb-4 font-semibold text-white">Last cycle report</h2>
+          <h2 className="mb-4 font-semibold text-white">
+            Last cycle — what the agents did
+          </h2>
           {!report ? (
             <p className="text-sm text-slate-500">
               No cycle has run yet. Hit “Run one cycle” to trigger one now.
@@ -58,22 +82,49 @@ export default async function AutonomyPage() {
                 <span className="text-slate-400">Trigger</span>
                 <Badge>{report.trigger}</Badge>
               </li>
-              <li className="flex items-start justify-between gap-3">
-                <span className="text-slate-400">Discovery</span>
-                <span className="min-w-0 text-right text-white">
-                  {report.discovery.ran
-                    ? report.discovery.summary ?? "ran"
-                    : "skipped"}
-                </span>
-              </li>
-              <li className="flex items-center justify-between">
-                <span className="text-slate-400">GitHub findings</span>
-                <span className="text-white">
-                  {report.github.scanned
-                    ? `${report.github.findings} found · ${report.github.tasksOpened} task(s) opened`
-                    : "not scanned"}
-                </span>
-              </li>
+              <CycleRow
+                label="Discovery"
+                ok={report.discovery.ran}
+                text={report.discovery.summary ?? (report.discovery.ran ? "ran" : "skipped")}
+              />
+              <CycleRow
+                label="Showcase sync"
+                ok={!!report.showcase?.synced}
+                text={
+                  report.showcase
+                    ? `${report.showcase.repos} repos · ${report.showcase.featured} featured`
+                    : "—"
+                }
+              />
+              <CycleRow
+                label="Profile README"
+                ok={!!report.profile?.updated}
+                text={
+                  report.profile
+                    ? report.profile.updated
+                      ? "updated"
+                      : report.profile.reason ?? "no change"
+                    : "—"
+                }
+              />
+              <CycleRow
+                label="New project (incubator)"
+                ok={!!report.incubator?.created}
+                text={
+                  report.incubator?.created
+                    ? `created ${report.incubator.repo}`
+                    : report.incubator?.reason ?? "—"
+                }
+              />
+              <CycleRow
+                label="Development (code commit)"
+                ok={!!report.development?.committed}
+                text={
+                  report.development?.committed
+                    ? `${report.development.repo} · ${report.development.file}`
+                    : report.development?.reason ?? "—"
+                }
+              />
               {report.errors.length > 0 && (
                 <li className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">
                   {report.errors.join("; ")}
@@ -83,47 +134,55 @@ export default async function AutonomyPage() {
           )}
         </Card>
 
-        <Card>
-          <h2 className="mb-4 font-semibold text-white">Connected repos</h2>
-          {s.github.connected ? (
-            s.github.repos.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                Token set, but no repos listed. Add{" "}
-                <code className="text-brand-cyan">GITHUB_REPOS</code> (comma-
-                separated <code className="text-brand-cyan">owner/repo</code>).
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {s.github.repos.map((r) => (
+        <div className="space-y-6">
+          <Card>
+            <h2 className="mb-3 font-semibold text-white">AI providers</h2>
+            <p className="text-xs text-slate-500">
+              Live LLM fallback chain — work rolls to the next on rate-limit.
+            </p>
+            {s.llm?.providers && s.llm.providers.length > 0 ? (
+              <ol className="mt-3 space-y-1.5">
+                {s.llm.providers.map((p, i) => (
                   <li
-                    key={r}
+                    key={`${p}-${i}`}
                     className="flex items-center gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm text-white"
                   >
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    {r}
+                    <span className="text-xs text-slate-500">{i + 1}.</span>
+                    <span className="truncate">{p}</span>
                   </li>
                 ))}
-              </ul>
-            )
-          ) : (
-            <div className="text-sm text-slate-400">
-              <p className="mb-2">
-                GitHub isn’t connected. To let the engine maintain your repos,
-                set in <code className="text-brand-cyan">.env</code>:
+              </ol>
+            ) : (
+              <p className="mt-3 text-sm text-slate-400">
+                {s.agentRunner ?? "mock runner"}
               </p>
-              <pre className="overflow-x-auto rounded-lg bg-black/40 p-3 text-xs text-slate-300">
-                {`GITHUB_TOKEN=ghp_…\nGITHUB_REPOS=you/repo-a,you/repo-b`}
-              </pre>
-            </div>
-          )}
-        </Card>
+            )}
+            <p className="mt-3 text-xs text-slate-500">
+              Cycle every {minutes} min ·{" "}
+              {s.incubator?.enabled
+                ? `incubator on (max ${s.incubator.max})`
+                : "incubator off"}
+            </p>
+          </Card>
+
+          <Card>
+            <h2 className="mb-3 font-semibold text-white">GitHub</h2>
+            {s.github.connected ? (
+              <p className="text-sm text-emerald-300">
+                Connected — maintaining your repos + profile.
+              </p>
+            ) : (
+              <p className="text-sm text-amber-300">
+                Not connected — set <code className="text-brand-cyan">GITHUB_TOKEN</code>.
+              </p>
+            )}
+          </Card>
+        </div>
       </div>
 
       <p className="mt-6 text-xs text-slate-600">
-        True 24/7 requires the API to run on an always-on host (Railway / Render
-        / Fly), and live agent reasoning requires a metered{" "}
-        <code className="text-slate-500">ANTHROPIC_API_KEY</code>. Until then the
-        loop runs on the mock runner with real GitHub reads.
+        Runs 24/7 on Render with free, live LLMs. Every action is gated by the
+        approval policy and written to the immutable activity log.
       </p>
     </>
   );

@@ -13,6 +13,12 @@ export class AgentsController {
     return this.agents.findAll();
   }
 
+  // Declared before ":id" so "analytics" isn't captured as a param.
+  @Get("analytics")
+  analytics() {
+    return this.agents.analytics();
+  }
+
   @Get(":id")
   findOne(@Param("id") id: string) {
     return this.agents.findOne(id);
