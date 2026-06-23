@@ -798,17 +798,18 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
    */
   private async runProjectDevelopment(report: TickReport) {
     if (!this.github.configured()) return;
+    const MAX_DEV_FILES = 40; // keep building each project up to this many files
     try {
       const project = await this.prisma.project.findFirst({
         where: {
           source: "incubated",
-          devStep: { lt: DEV_PLAN.length },
+          devStep: { lt: MAX_DEV_FILES },
           repoUrl: { not: null },
         },
         orderBy: [{ devStep: "asc" }, { lastSyncedAt: "asc" }],
       });
       if (!project) {
-        report.development.reason = "no incubated project needs building";
+        report.development.reason = "all incubated projects fully built";
         return;
       }
       report.development.ran = true;
@@ -818,8 +819,6 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
         report.development.reason = "unparseable repoUrl";
         return;
       }
-      const step = DEV_PLAN[project.devStep];
-
       const dev = await this.prisma.agent.findFirst({
         where: { type: "DEVELOPER" },
       });
@@ -829,46 +828,84 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       }
       await this.ensurePermissions(dev.id, dev.permissions, ["code.generate"]);
 
-      // Ask the Developer agent (LLM) to write the file; fall back to a sane
-      // deterministic version so a commit always lands.
-      const outcome = await this.brain.dispatch({
-        agentId: dev.id,
-        actionType: "code.generate",
-        title: `Build ${project.name}: ${step.path}`,
-        payload: {
-          project: project.name,
-          description: project.description ?? "",
-          file: step.path,
-          instruction: step.instruction,
-          note: "Return ONLY the raw file contents in output.content — no markdown fences, no commentary.",
-        },
-      });
+      let path: string;
+      let content: string;
 
-      let content = "";
-      if (outcome.status === "executed") {
+      if (project.devStep < DEV_PLAN.length) {
+        // ── Scaffold phase: deterministic plan, LLM writes each file ──
+        const step = DEV_PLAN[project.devStep];
+        path = step.path;
+        const outcome = await this.brain.dispatch({
+          agentId: dev.id,
+          actionType: "code.generate",
+          title: `Scaffold ${project.name}: ${step.path}`,
+          payload: {
+            project: project.name,
+            description: project.description ?? "",
+            file: step.path,
+            instruction: step.instruction,
+            note: "Return ONLY the raw file contents in output.content — no fences, no commentary.",
+          },
+        });
+        if (outcome.status !== "executed") {
+          report.development.reason = "blocked by approval policy";
+          return;
+        }
+        content =
+          this.extractFileContent(outcome.result.output) ||
+          step.fallback(project.name, project.description ?? "");
+      } else {
+        // ── Open-ended phase: the agent builds the next real feature, choosing
+        //    the file itself from the repo's current contents. This is what lets
+        //    projects grow into real products instead of stopping at a scaffold.
+        const files = await this.github.listRepoFiles(repo);
+        const outcome = await this.brain.dispatch({
+          agentId: dev.id,
+          actionType: "code.generate",
+          title: `Develop ${project.name} (feature ${project.devStep + 1})`,
+          payload: {
+            project: project.name,
+            description: project.description ?? "",
+            existingFiles: files,
+            instruction:
+              "You are incrementally building this project into a real, working product. " +
+              "Review the existing files listed, then choose the SINGLE next most valuable file " +
+              "to ADD (a feature module, API route, UI component, test, type, or config) or a " +
+              "substantial improvement to an existing one. Respond with ONLY JSON of the form " +
+              '{"summary":"<what this adds>","output":{"path":"<relative file path>","content":"<COMPLETE file contents>"}}. ' +
+              "Write complete, production-quality code that builds real functionality. " +
+              "Do not output placeholders, TODOs-only files, or files that already exist unless improving them.",
+          },
+        });
+        if (outcome.status !== "executed") {
+          report.development.reason = "blocked by approval policy";
+          return;
+        }
         const out = (outcome.result.output ?? {}) as Record<string, unknown>;
-        if (typeof out.content === "string") content = out.content;
-      }
-      content = content.trim();
-      if (content.startsWith("```")) {
-        content = content
-          .replace(/^```[^\n]*\n/, "")
-          .replace(/\n```\s*$/, "")
-          .trim();
-      }
-      if (!content) {
-        content = step.fallback(project.name, project.description ?? "");
+        const safe = this.sanitizeDevPath(
+          typeof out.path === "string" ? out.path : "",
+        );
+        content = this.extractFileContent(out);
+        if (!safe) {
+          report.development.reason = "model chose an unsafe/invalid path";
+          return;
+        }
+        if (!content || content.length < 20) {
+          report.development.reason = "model returned no usable file";
+          return;
+        }
+        path = safe;
       }
 
-      const existing = await this.github.getFile(repo, step.path);
+      content = content.trim();
+      const existing = await this.github.getFile(repo, path);
       await this.github.putFile(
         repo,
-        step.path,
+        path,
         content.endsWith("\n") ? content : content + "\n",
-        `feat: ${step.path} (OnGo dev agent)`,
+        `feat: ${path} (OnGo dev agent)`,
         existing?.sha,
       );
-
       await this.prisma.project.update({
         where: { id: project.id },
         data: {
@@ -879,11 +916,58 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       });
       report.development.committed = true;
       report.development.repo = repo;
-      report.development.file = step.path;
+      report.development.file = path;
     } catch (err) {
       report.errors.push(`development: ${String(err)}`);
       report.development.reason = String(err).slice(0, 140);
     }
+  }
+
+  /**
+   * Make an LLM-chosen path safe to commit: normalize separators, strip any
+   * traversal, block ALL hidden files/dirs (covers .github/workflows CI
+   * injection, .git, .env, .npmrc, dotfiles), and require the file to live
+   * under a known source/docs directory or be a normal root-level file.
+   * Returns null if the path can't be made safe. The untrusted LLM never gets
+   * to write CI configs or secrets — only real project code under safe dirs.
+   */
+  private sanitizeDevPath(raw: string): string | null {
+    if (!raw) return null;
+    const segs = raw
+      .trim()
+      .replace(/\\/g, "/")
+      .split("/")
+      .map((s) => s.trim())
+      .filter((s) => s && s !== "." && s !== "..");
+    if (segs.length === 0) return null;
+    if (segs.some((s) => s.startsWith("."))) return null; // no dotfiles/dirs
+    const path = segs.join("/");
+    if (path.length > 200) return null;
+    const ALLOWED_TOP = new Set([
+      "src", "lib", "app", "pages", "components", "server", "api", "routes",
+      "tests", "test", "__tests__", "docs", "public", "config", "styles",
+      "scripts", "models", "utils", "hooks", "types", "assets", "data",
+      "services", "controllers", "middleware", "views",
+    ]);
+    const top = segs[0];
+    const isRootFile = segs.length === 1 && /\.[a-z0-9]+$/i.test(top);
+    if (!ALLOWED_TOP.has(top) && !isRootFile) return null;
+    return path;
+  }
+
+  /** Pull file content from a code.generate output, stripping markdown fences. */
+  private extractFileContent(
+    output: Record<string, unknown> | undefined,
+  ): string {
+    let content = typeof output?.content === "string" ? output.content : "";
+    content = content.trim();
+    if (content.startsWith("```")) {
+      content = content
+        .replace(/^```[^\n]*\n/, "")
+        .replace(/\n```\s*$/, "")
+        .trim();
+    }
+    return content;
   }
 
   /** Extract "owner/repo" from a GitHub URL. */

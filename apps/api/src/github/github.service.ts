@@ -335,6 +335,23 @@ export class GithubService {
     });
   }
 
+  /** List file paths in a repo's default branch (blobs only) for dev context. */
+  async listRepoFiles(repo: string, limit = 200): Promise<string[]> {
+    try {
+      const info = await this.gh<{ default_branch: string }>(`/repos/${repo}`);
+      const tree = await this.gh<{
+        tree: Array<{ path: string; type: string }>;
+      }>(`/repos/${repo}/git/trees/${info.default_branch}?recursive=1`);
+      return tree.tree
+        .filter((t) => t.type === "blob")
+        .map((t) => t.path)
+        .slice(0, limit);
+    } catch (err) {
+      this.logger.warn(`listRepoFiles ${repo} failed: ${String(err)}`);
+      return [];
+    }
+  }
+
   async commentOnIssue(repo: string, issueNumber: number, body: string) {
     return this.gh(`/repos/${repo}/issues/${issueNumber}/comments`, {
       method: "POST",

@@ -39,7 +39,8 @@ export class OpenAiCompatibleAgentRunner extends AgentRunner {
         body: JSON.stringify({
           model: this.model,
           temperature: 0.7,
-          max_tokens: 1024,
+          // Room for real code files (a full module can exceed 1k tokens).
+          max_tokens: 4096,
           messages: [
             { role: "system", content: system },
             { role: "user", content: user },

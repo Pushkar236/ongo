@@ -25,7 +25,9 @@ export class AnthropicAgentRunner extends AgentRunner {
     try {
       const res = await this.client.messages.create({
         model: this.model,
-        max_tokens: 1024,
+        // Room for complete code files + the JSON wrapper (matches the
+        // OpenAI-compatible runner); 1k truncates real code generation.
+        max_tokens: 4096,
         system,
         messages: [{ role: "user", content: user }],
       });
