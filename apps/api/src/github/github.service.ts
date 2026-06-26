@@ -121,6 +121,37 @@ export class GithubService {
     return this.showcaseUser;
   }
 
+  /**
+   * Recently-popular repos for a language — a real "what's trending" signal
+   * used to ground idea generation. Token-optional (works unauthenticated,
+   * just rate-limited). Returns "owner/repo (stars) — description" lines.
+   */
+  async searchTrending(language: string, limit = 10): Promise<string[]> {
+    try {
+      const since = new Date(Date.now() - 30 * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      const q = encodeURIComponent(`language:${language} created:>${since}`);
+      const data = await this.request<{
+        items: Array<{
+          full_name: string;
+          description: string | null;
+          stargazers_count: number;
+        }>;
+      }>(
+        `/search/repositories?q=${q}&sort=stars&order=desc&per_page=${limit}`,
+        undefined,
+        this.token,
+      );
+      return (data.items ?? []).map((r) =>
+        `${r.full_name} (${r.stargazers_count}★) ${r.description ?? ""}`.trim(),
+      );
+    } catch (err) {
+      this.logger.warn(`searchTrending failed: ${String(err)}`);
+      return [];
+    }
+  }
+
   configuredRepos(): RepoRef[] {
     return this.repos;
   }

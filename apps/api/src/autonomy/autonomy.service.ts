@@ -116,7 +116,13 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
   // Project incubator: auto-create repos from discovered ideas. Off by default
   // (opt in with AUTONOMY_INCUBATOR=true) and capped so it can't run away.
   private readonly incubatorEnabled: boolean;
-  private readonly incubatorMax: number;
+  private incubatorMax: number;
+  // Master switch for ALL autonomous code-writing (incubation + the dev loop).
+  // OFF by default → "curation-only" mode: the engine still discovers ideas,
+  // syncs the showcase, and refreshes the profile, but never generates code or
+  // creates repos on its own. Flip on (DB Setting autonomy.buildEnabled, or env
+  // AUTONOMY_BUILD) only once a verification gate / human review is in place.
+  private buildEnabled: boolean;
 
   constructor(
     private readonly config: ConfigService,
@@ -131,6 +137,8 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
     const inc = (config.get<string>("AUTONOMY_INCUBATOR") ?? "").toLowerCase();
     this.incubatorEnabled = inc === "true" || inc === "1" || inc === "yes";
     this.incubatorMax = Number(config.get("AUTONOMY_INCUBATOR_MAX")) || 3;
+    const build = (config.get<string>("AUTONOMY_BUILD") ?? "").toLowerCase();
+    this.buildEnabled = build === "true" || build === "1" || build === "yes";
   }
 
   async onModuleInit() {
@@ -142,6 +150,16 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       });
       const v = Number(s?.value);
       if (Number.isFinite(v) && v >= 15000) this.intervalMs = v;
+      const im = await this.prisma.setting.findUnique({
+        where: { key: "autonomy.incubatorMax" },
+      });
+      const imv = Number(im?.value);
+      if (Number.isFinite(imv) && imv >= 0) this.incubatorMax = imv;
+      const be = await this.prisma.setting.findUnique({
+        where: { key: "autonomy.buildEnabled" },
+      });
+      if (be?.value === "true") this.buildEnabled = true;
+      else if (be?.value === "false") this.buildEnabled = false;
     } catch {
       /* settings table not migrated yet — keep env/default */
     }
@@ -150,7 +168,11 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Founder-tunable runtime config; persists across redeploys via Settings. */
-  async setConfig(opts: { intervalMs?: number }) {
+  async setConfig(opts: {
+    intervalMs?: number;
+    incubatorMax?: number;
+    buildEnabled?: boolean;
+  }) {
     if (opts.intervalMs != null) {
       const ms = Math.max(15000, Math.floor(opts.intervalMs));
       this.intervalMs = ms;
@@ -164,6 +186,26 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
         this.stop();
         this.start();
       }
+    }
+    if (opts.incubatorMax != null) {
+      const max = Math.max(0, Math.min(50, Math.floor(opts.incubatorMax)));
+      this.incubatorMax = max;
+      await this.prisma.setting.upsert({
+        where: { key: "autonomy.incubatorMax" },
+        create: { key: "autonomy.incubatorMax", value: String(max) },
+        update: { value: String(max) },
+      });
+    }
+    if (opts.buildEnabled != null) {
+      this.buildEnabled = opts.buildEnabled;
+      await this.prisma.setting.upsert({
+        where: { key: "autonomy.buildEnabled" },
+        create: {
+          key: "autonomy.buildEnabled",
+          value: String(opts.buildEnabled),
+        },
+        update: { value: String(opts.buildEnabled) },
+      });
     }
     return this.status();
   }
@@ -207,6 +249,8 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       agentRunner: this.brain.runnerKind(),
       llm: this.llmDiagnostics(),
       github: this.github.status(),
+      buildEnabled: this.buildEnabled,
+      mode: this.buildEnabled ? "building" : "curation-only",
       incubator: { enabled: this.incubatorEnabled, max: this.incubatorMax },
       lastReport: this.lastReport,
     };
@@ -283,8 +327,16 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       await this.runGithubMaintenance(report);
       await this.runShowcaseSync(report);
       await this.runProfileSync(report);
-      await this.runProjectIncubator(report);
-      await this.runProjectDevelopment(report);
+      // Autonomous code-writing only runs when explicitly enabled. Default is
+      // curation-only mode (Option A): discover + showcase + profile, but the
+      // engine never incubates repos or writes code unsupervised.
+      if (this.buildEnabled) {
+        await this.runProjectIncubator(report);
+        await this.runProjectDevelopment(report);
+      } else {
+        report.incubator.reason = "autonomous building disabled (curation-only mode)";
+        report.development.reason = "autonomous building disabled (curation-only mode)";
+      }
       await this.heartbeat(report);
     } catch (err) {
       report.errors.push(String(err));
@@ -317,11 +369,18 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
         };
         return;
       }
+      // Ground the idea in REAL signals + the founder's profile so the result
+      // is a specific, buildable product — not a generic "AI automation" idea.
+      const signals = await this.fetchSignals();
+      const founder =
+        this.config.get<string>("FOUNDER_PROFILE")?.trim() ||
+        "a solo full-stack developer (TypeScript, React, Next.js, Node, Tailwind) " +
+          "building a standout GitHub portfolio and attracting freelance + SaaS clients in India";
       const outcome = await this.brain.dispatch({
         agentId: research.id,
         actionType: "research.scan",
         title: "Autonomous market scan",
-        payload: { trigger: "autonomy", at: report.at },
+        payload: { trigger: "autonomy", at: report.at, founder, signals },
       });
       report.discovery = {
         ran: true,
@@ -458,6 +517,32 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
     } catch (err) {
       report.errors.push(`showcase: ${String(err)}`);
     }
+  }
+
+  /** Real, current signals (HN front page + GitHub trending) to ground ideas. */
+  private async fetchSignals(): Promise<string[]> {
+    const signals: string[] = [];
+    try {
+      const res = await fetch(
+        "https://hn.algolia.com/api/v1/search?tags=front_page",
+        { signal: AbortSignal.timeout(8000) },
+      );
+      if (res.ok) {
+        const d = (await res.json()) as { hits?: Array<{ title?: string }> };
+        for (const h of (d.hits ?? []).slice(0, 10)) {
+          if (h.title) signals.push(`HN: ${h.title}`);
+        }
+      }
+    } catch {
+      /* non-fatal — signals are best-effort */
+    }
+    try {
+      const repos = await this.github.searchTrending("typescript", 10);
+      signals.push(...repos.map((r) => `GitHub: ${r}`));
+    } catch {
+      /* non-fatal */
+    }
+    return signals;
   }
 
   private slugify(s: string): string {
@@ -613,6 +698,15 @@ export class AutonomyService implements OnModuleInit, OnModuleDestroy {
       incubator: { ran: false, created: false },
       errors: [],
     } as unknown as TickReport;
+    // Curation-only mode also halts manual incubation: the current builder is
+    // known to produce incoherent code, so nothing is created until building is
+    // deliberately re-enabled (with a review/verification gate). Override via
+    // POST /autonomy/config { "buildEnabled": true }.
+    if (!this.buildEnabled) {
+      report.incubator.reason =
+        "autonomous building disabled (curation-only mode) — enable buildEnabled to incubate";
+      return report.incubator;
+    }
     await this.runProjectIncubator(report, true);
     return report.incubator;
   }

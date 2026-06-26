@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsInt, IsOptional, Min } from "class-validator";
+import { IsBoolean, IsInt, IsOptional, Min } from "class-validator";
 
 export class AutonomyConfigDto {
   @ApiPropertyOptional({
@@ -10,4 +10,23 @@ export class AutonomyConfigDto {
   @IsInt()
   @Min(15000)
   intervalMs?: number;
+
+  @ApiPropertyOptional({
+    description: "Max number of auto-incubated projects (0-50). Persists.",
+    example: 6,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  incubatorMax?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Master switch for autonomous code-writing (incubation + dev loop). " +
+      "false = curation-only mode (default). Persists.",
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  buildEnabled?: boolean;
 }
