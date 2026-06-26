@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { PillButton } from "./x/PillButton";
 
 export default function ConvertLead({ id }: { id: string }) {
   const router = useRouter();
@@ -15,12 +16,8 @@ export default function ConvertLead({ id }: { id: string }) {
   }
 
   return (
-    <button
-      onClick={convert}
-      disabled={busy}
-      className="rounded-lg border border-white/15 px-3 py-1.5 text-sm font-semibold text-brand-cyan transition hover:bg-white/5 disabled:opacity-50"
-    >
+    <PillButton variant="outline" onClick={convert} disabled={busy}>
       {busy ? "Converting…" : "Convert → Opportunity"}
-    </button>
+    </PillButton>
   );
 }

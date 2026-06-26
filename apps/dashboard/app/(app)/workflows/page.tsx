@@ -1,10 +1,19 @@
 import { apiFetch } from "@/lib/api";
 import RunPipeline from "@/components/RunPipeline";
-import { Badge, Card, PageHeader } from "@/components/ui";
-import { timeAgo } from "@/lib/format";
+import { Badge, Card } from "@/components/ui";
+import { handleFor, timeAgo } from "@/lib/format";
 import type { Pipeline, WorkflowRun } from "@/lib/types";
+import { ColumnHeader } from "@/components/x/ColumnHeader";
+import { AgentAvatar } from "@/components/x/Avatar";
 
 export const dynamic = "force-dynamic";
+
+const stepColor = (status: string) =>
+  status === "executed"
+    ? "var(--color-x-green)"
+    : status === "pending_approval"
+      ? "var(--color-x-amber)"
+      : "var(--color-x-red)";
 
 export default async function WorkflowsPage() {
   const [catalog, runs] = await Promise.all([
@@ -14,23 +23,17 @@ export default async function WorkflowsPage() {
 
   return (
     <>
-      <PageHeader
+      <ColumnHeader
         title="Workflows"
-        subtitle="Chain specialist agents into pipelines. Every step runs through the Brain — high-risk steps pause for your approval."
+        subtitle="Chain specialist agents into pipelines"
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 p-4 sm:grid-cols-2">
         {catalog.map((p) => (
           <Card key={p.key}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="font-semibold text-white">{p.name}</h3>
-                <p className="mt-1 text-sm text-slate-400">{p.description}</p>
-                <div className="mt-2 text-xs text-slate-500">
-                  {p.steps} agent steps
-                </div>
-              </div>
-            </div>
+            <h3 className="font-bold text-x-text">{p.name}</h3>
+            <p className="mt-1 text-sm text-x-muted">{p.description}</p>
+            <div className="mt-2 text-xs text-x-muted">{p.steps} agent steps</div>
             <div className="mt-4">
               <RunPipeline pipeline={p.key} />
             </div>
@@ -38,48 +41,48 @@ export default async function WorkflowsPage() {
         ))}
       </div>
 
-      <h2 className="mb-3 mt-8 text-sm font-semibold uppercase tracking-wide text-slate-400">
-        Recent runs ({runs.length})
-      </h2>
+      <div className="px-4 py-3">
+        <h2 className="font-bold text-x-text">Recent runs ({runs.length})</h2>
+      </div>
       {runs.length === 0 ? (
-        <Card>
-          <p className="text-sm text-slate-500">No runs yet — start one above.</p>
-        </Card>
+        <p className="p-8 text-center text-sm text-x-muted">
+          No runs yet — start one above.
+        </p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 px-4 pb-4">
           {runs.slice(0, 12).map((w) => (
             <Card key={w.id}>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <span className="font-semibold text-white">{w.name}</span>
-                  <span className="ml-2 text-xs text-slate-500">
+                  <span className="font-bold text-x-text">{w.name}</span>
+                  <span className="ml-2 text-xs text-x-muted">
                     {timeAgo(w.createdAt)}
                   </span>
                 </div>
                 <Badge>{w.status}</Badge>
               </div>
-              <ol className="mt-3 space-y-1.5">
+              {/* the agent chain */}
+              <ol className="mt-3 space-y-2">
                 {(w.steps ?? []).map((s, i) => (
-                  <li
-                    key={i}
-                    className="flex items-center gap-3 text-sm text-slate-400"
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
-                        s.status === "executed"
-                          ? "bg-emerald-400"
-                          : s.status === "pending_approval"
-                            ? "bg-amber-400"
-                            : "bg-rose-400"
-                      }`}
-                    />
-                    <span className="text-slate-300">{s.agentType}</span>
-                    <span className="text-slate-500">{s.actionType}</span>
-                    {s.summary && (
-                      <span className="truncate text-slate-500">
-                        — {s.summary}
+                  <li key={i} className="flex items-center gap-3">
+                    <AgentAvatar type={s.agentType} size={28} />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm font-semibold text-x-text">
+                        {handleFor(s.agentType)}
                       </span>
-                    )}
+                      <span className="ml-2 text-xs text-x-muted">
+                        {s.actionType}
+                      </span>
+                      {s.summary && (
+                        <div className="truncate text-xs text-x-muted">
+                          {s.summary}
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: stepColor(s.status) }}
+                    />
                   </li>
                 ))}
               </ol>

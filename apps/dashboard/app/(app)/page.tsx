@@ -1,103 +1,110 @@
 import Link from "next/link";
+import { Cpu, User } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { Badge, Card, PageHeader, StatCard } from "@/components/ui";
-import { inr, timeAgo } from "@/lib/format";
-import type { ActivityItem, Approval, Overview } from "@/lib/types";
+import { StatCard } from "@/components/ui";
+import { inr, actionVerb, handleFor, timeAgo } from "@/lib/format";
+import { actionMeta } from "@/lib/agentMeta";
+import type { ActivityItem, Agent, Approval, Overview } from "@/lib/types";
+import { ColumnHeader } from "@/components/x/ColumnHeader";
+import { AgentsLive } from "@/components/x/AgentsLive";
+import { TimelineRow } from "@/components/x/Feed";
+import { AgentAvatar, Avatar } from "@/components/x/Avatar";
+import { Chip } from "@/components/x/Chip";
+import { Badge } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
-  const [overview, approvals, activity] = await Promise.all([
+  const [overview, approvals, activity, agents] = await Promise.all([
     apiFetch<Overview>("/dashboard/overview"),
     apiFetch<Approval[]>("/approvals?status=PENDING"),
-    apiFetch<ActivityItem[]>("/activity?limit=8"),
+    apiFetch<ActivityItem[]>("/activity?limit=15"),
+    apiFetch<Agent[]>("/agents").catch(() => [] as Agent[]),
   ]);
+  const typeByName = new Map(agents.map((a) => [a.name, a.type]));
 
   return (
     <>
-      <PageHeader
-        title="Command Center"
-        subtitle="Your agency at a glance. Agents do the work; you make the decisions."
-      />
+      <ColumnHeader title="Home" subtitle="Your workforce, live" />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        <StatCard label="Active Projects" value={overview.activeProjects} accent="blue" />
-        <StatCard label="Active Agents" value={overview.activeAgents} accent="cyan" />
-        <StatCard label="Open Tasks" value={overview.openTasks} accent="purple" />
+      {/* Hero: agents working */}
+      <AgentsLive />
+
+      {/* Stat strip */}
+      <div className="grid grid-cols-2 gap-3 border-b border-x-border p-4 sm:grid-cols-4">
+        <StatCard label="Projects" value={overview.activeProjects} accent="blue" />
+        <StatCard label="Agents" value={overview.activeAgents} accent="green" />
+        <StatCard label="Open tasks" value={overview.openTasks} accent="purple" />
         <StatCard
-          label="Pending Approvals"
+          label="Approvals"
           value={overview.pendingApprovals}
           accent="amber"
-          hint={overview.pendingApprovals > 0 ? "needs your decision" : "all clear"}
         />
-        <StatCard label="Deploys Today" value={overview.deploymentsToday} accent="cyan" />
-        <StatCard label="New Opportunities" value={overview.newOpportunities} accent="purple" />
-        <StatCard
-          label="New Leads"
-          value={overview.newLeads}
-          accent="cyan"
-          hint={overview.newLeads > 0 ? "from the marketplace" : undefined}
-        />
-        <StatCard
-          label="Total Revenue"
-          value={inr(overview.totalRevenue)}
-          accent="blue"
-        />
+        <StatCard label="Opportunities" value={overview.newOpportunities} accent="blue" />
+        <StatCard label="Leads" value={overview.newLeads} accent="cyan" />
+        <StatCard label="Deploys today" value={overview.deploymentsToday} accent="green" />
+        <StatCard label="Revenue" value={inr(overview.totalRevenue)} accent="blue" />
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-white">Pending Approvals</h2>
-            <Link href="/approvals" className="text-xs text-brand-cyan hover:underline">
-              View all →
+      {/* Pending approvals preview */}
+      {approvals.length > 0 && (
+        <div className="border-b border-x-border">
+          <div className="flex items-center justify-between px-4 py-3">
+            <h2 className="font-bold text-x-text">Needs your decision</h2>
+            <Link href="/approvals" className="text-sm text-x-blue hover:underline">
+              View all
             </Link>
           </div>
-          {approvals.length === 0 ? (
-            <p className="text-sm text-slate-500">Nothing waiting on you. 🎉</p>
-          ) : (
-            <ul className="space-y-3">
-              {approvals.slice(0, 5).map((a) => (
-                <li
-                  key={a.id}
-                  className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.03] px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm text-white">{a.title}</div>
-                    <div className="text-xs text-slate-500">
-                      {a.requestedByAgent?.name ?? "system"} · {a.actionType}
-                    </div>
-                  </div>
-                  <Badge>{a.riskLevel}</Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+          {approvals.slice(0, 3).map((a) => (
+            <TimelineRow
+              key={a.id}
+              href="/approvals"
+              avatar={<AgentAvatar type={a.requestedByAgent?.type} size={40} />}
+              name={a.requestedByAgent?.name ?? "System"}
+              handle={handleFor(a.requestedByAgent?.type)}
+              time={timeAgo(a.createdAt)}
+              chip={<Badge>{a.riskLevel}</Badge>}
+            >
+              {a.title}
+            </TimelineRow>
+          ))}
+        </div>
+      )}
 
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-white">Agent Activity</h2>
-            <Link href="/activity" className="text-xs text-brand-cyan hover:underline">
-              View all →
-            </Link>
-          </div>
-          <ul className="space-y-3">
-            {activity.map((item) => (
-              <li key={item.id} className="flex items-start gap-3 text-sm">
-                <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-cyan" />
-                <div className="min-w-0">
-                  <span className="text-white">{item.actorName ?? "system"}</span>{" "}
-                  <span className="text-slate-400">{item.action}</span>
-                  <div className="text-xs text-slate-600">
-                    {timeAgo(item.createdAt)}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
+      {/* Activity feed */}
+      <div className="px-4 py-3">
+        <h2 className="font-bold text-x-text">Latest activity</h2>
       </div>
+      {activity.map((item) => {
+        const m = actionMeta(item.action);
+        const isAgent = item.actorType === "AGENT";
+        const type = isAgent ? typeByName.get(item.actorName ?? "") : null;
+        return (
+          <TimelineRow
+            key={item.id}
+            avatar={
+              isAgent ? (
+                <AgentAvatar type={type} size={40} />
+              ) : item.actorType === "HUMAN" ? (
+                <Avatar size={40} color="#536471">
+                  <User className="h-5 w-5" />
+                </Avatar>
+              ) : (
+                <Avatar size={40} color="#16181c">
+                  <Cpu className="h-5 w-5 text-x-muted" />
+                </Avatar>
+              )
+            }
+            name={item.actorName ?? "System"}
+            handle={isAgent ? handleFor(type) : `@${item.actorType.toLowerCase()}`}
+            time={timeAgo(item.createdAt)}
+            chip={<Chip label={m.label} color={m.color} />}
+          >
+            <span className="text-x-text">{actionVerb(item.action)}</span>
+            {item.entity && <span className="text-x-muted"> · {item.entity}</span>}
+          </TimelineRow>
+        );
+      })}
     </>
   );
 }

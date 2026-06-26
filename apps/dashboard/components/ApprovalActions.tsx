@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { PillButton } from "./x/PillButton";
 
 export default function ApprovalActions({ id }: { id: string }) {
   const router = useRouter();
@@ -20,20 +21,16 @@ export default function ApprovalActions({ id }: { id: string }) {
 
   return (
     <div className="flex gap-2">
-      <button
-        onClick={() => act("approve")}
-        disabled={busy !== null}
-        className="rounded-lg bg-emerald-500/90 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
-      >
+      <PillButton onClick={() => act("approve")} disabled={busy !== null}>
         {busy === "approve" ? "Approving…" : "Approve"}
-      </button>
-      <button
+      </PillButton>
+      <PillButton
+        variant="outline"
         onClick={() => act("reject")}
         disabled={busy !== null}
-        className="rounded-lg border border-white/15 px-3 py-1.5 text-sm font-semibold text-slate-300 transition hover:bg-white/5 disabled:opacity-50"
       >
         {busy === "reject" ? "Rejecting…" : "Reject"}
-      </button>
+      </PillButton>
     </div>
   );
 }

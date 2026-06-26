@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Play } from "lucide-react";
+import { PillButton } from "./x/PillButton";
 
 export default function RunPipeline({ pipeline }: { pipeline: string }) {
   const router = useRouter();
@@ -33,15 +34,11 @@ export default function RunPipeline({ pipeline }: { pipeline: string }) {
 
   return (
     <div className="flex items-center gap-3">
-      <button
-        onClick={run}
-        disabled={busy}
-        className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-brand-cyan to-brand-blue px-3 py-1.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-      >
+      <PillButton onClick={run} disabled={busy}>
         <Play className="h-3.5 w-3.5" aria-hidden />
         {busy ? "Running…" : "Run"}
-      </button>
-      {note && <span className="text-xs text-slate-400">{note}</span>}
+      </PillButton>
+      {note && <span className="text-xs text-x-muted">{note}</span>}
     </div>
   );
 }

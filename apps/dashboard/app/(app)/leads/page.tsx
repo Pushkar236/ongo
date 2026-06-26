@@ -1,66 +1,63 @@
+import { User } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import ConvertLead from "@/components/ConvertLead";
-import { Badge, Card, PageHeader } from "@/components/ui";
+import { Badge } from "@/components/ui";
 import { timeAgo } from "@/lib/format";
 import type { Lead } from "@/lib/types";
+import { ColumnHeader } from "@/components/x/ColumnHeader";
+import { TimelineRow } from "@/components/x/Feed";
+import { Avatar } from "@/components/x/Avatar";
 
 export const dynamic = "force-dynamic";
 
 export default async function LeadsPage() {
   const leads = await apiFetch<Lead[]>("/leads");
-  const open = leads.filter((l) => l.status !== "CONVERTED" && l.status !== "REJECTED");
+  const open = leads.filter(
+    (l) => l.status !== "CONVERTED" && l.status !== "REJECTED",
+  );
 
   return (
     <>
-      <PageHeader
-        title="Marketplace Leads"
-        subtitle="Inbound project requests from the public site. Convert a lead into a tracked opportunity."
+      <ColumnHeader
+        title="Leads"
+        subtitle={`${open.length} open · ${leads.length - open.length} closed`}
       />
 
       {leads.length === 0 ? (
-        <Card>
-          <p className="text-sm text-slate-500">
-            No leads yet. Requests submitted on the marketplace land here.
-          </p>
-        </Card>
+        <p className="p-8 text-center text-sm text-x-muted">
+          No leads yet. Requests from the marketplace land here.
+        </p>
       ) : (
-        <div className="space-y-3">
-          {leads.map((l) => (
-            <Card key={l.id}>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-white">
-                      {l.contactName ?? "Anonymous"}
-                    </span>
-                    <Badge>{l.type}</Badge>
-                    <Badge>{l.status}</Badge>
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {l.contactEmail ?? "no email"} · {l.source} ·{" "}
-                    {timeAgo(l.createdAt)}
-                  </div>
-                  {l.request?.message && (
-                    <p className="mt-2 max-w-2xl text-sm text-slate-400">
-                      {l.request.message}
-                    </p>
-                  )}
-                  {l.opportunity && (
-                    <p className="mt-2 text-xs text-emerald-400">
-                      → converted to opportunity: {l.opportunity.title}
-                    </p>
-                  )}
-                </div>
-                {l.status !== "CONVERTED" && <ConvertLead id={l.id} />}
-              </div>
-            </Card>
-          ))}
-        </div>
+        leads.map((l) => (
+          <TimelineRow
+            key={l.id}
+            avatar={
+              <Avatar size={40} color="#536471">
+                {(l.contactName ?? "?")[0]?.toUpperCase() ?? <User className="h-5 w-5" />}
+              </Avatar>
+            }
+            name={l.contactName ?? "Anonymous"}
+            handle={l.contactEmail ?? undefined}
+            time={timeAgo(l.createdAt)}
+            chip={
+              <span className="flex gap-1.5">
+                <Badge>{l.type}</Badge>
+                <Badge>{l.status}</Badge>
+              </span>
+            }
+            actions={l.status !== "CONVERTED" ? <ConvertLead id={l.id} /> : undefined}
+          >
+            {l.request?.message && (
+              <p className="text-[15px] text-x-text">{l.request.message}</p>
+            )}
+            {l.opportunity && (
+              <p className="mt-1 text-xs text-x-green">
+                → converted to opportunity: {l.opportunity.title}
+              </p>
+            )}
+          </TimelineRow>
+        ))
       )}
-
-      <p className="mt-6 text-xs text-slate-600">
-        {open.length} open · {leads.length - open.length} closed
-      </p>
     </>
   );
 }

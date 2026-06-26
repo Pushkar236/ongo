@@ -1,7 +1,10 @@
 import { apiFetch } from "@/lib/api";
-import { Badge, Card, PageHeader } from "@/components/ui";
-import { inr } from "@/lib/format";
+import { Badge } from "@/components/ui";
+import { inr, handleFor } from "@/lib/format";
 import type { Opportunity } from "@/lib/types";
+import { ColumnHeader } from "@/components/x/ColumnHeader";
+import { TimelineRow } from "@/components/x/Feed";
+import { AgentAvatar } from "@/components/x/Avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -10,66 +13,58 @@ export default async function OpportunitiesPage() {
 
   return (
     <>
-      <PageHeader
+      <ColumnHeader
         title="Opportunities"
-        subtitle="Markets surfaced by the Research agent — ranked by demand, sized by revenue."
+        subtitle="Markets surfaced by Research — ranked by demand"
       />
+
       {opportunities.length === 0 ? (
-        <Card>
-          <p className="text-sm text-slate-500">
-            No opportunities yet. The Research agent will surface them here.
-          </p>
-        </Card>
+        <p className="p-8 text-center text-sm text-x-muted">
+          No opportunities yet. The Research agent will surface them here.
+        </p>
       ) : (
-        <div className="space-y-4">
-          {opportunities.map((o) => (
-            <Card key={o.id}>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-white">{o.title}</h3>
-                    <Badge>{o.status}</Badge>
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {o.market}
-                    {o.sourceAgent ? ` · found by ${o.sourceAgent.name}` : ""}
-                  </div>
-                  {o.recommendation && (
-                    <p className="mt-2 max-w-2xl text-sm text-slate-400">
-                      {o.recommendation}
-                    </p>
-                  )}
+        opportunities.map((o) => (
+          <TimelineRow
+            key={o.id}
+            avatar={<AgentAvatar type={o.sourceAgent?.type} size={40} />}
+            name={o.title}
+            handle={o.sourceAgent ? handleFor(o.sourceAgent.type) : undefined}
+            chip={<Badge>{o.status}</Badge>}
+          >
+            <div className="text-[13px] text-x-muted">
+              {o.market}
+              {o.sourceAgent ? ` · found by ${o.sourceAgent.name}` : ""}
+            </div>
+            {o.recommendation && (
+              <p className="mt-1 text-[15px] text-x-text">{o.recommendation}</p>
+            )}
+            <div className="mt-3 flex items-center gap-4">
+              <div className="flex-1">
+                <div className="mb-1 flex items-center justify-between text-xs text-x-muted">
+                  <span>Demand</span>
+                  <span className="font-semibold text-x-text">
+                    {o.demandScore}/100
+                  </span>
                 </div>
-                <div className="flex items-center gap-6 text-right">
-                  <div>
-                    <div className="text-2xl font-bold text-white">
-                      {o.demandScore}
-                    </div>
-                    <div className="text-[10px] uppercase tracking-wide text-slate-500">
-                      demand
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-semibold gradient-text">
-                      {inr(o.estRevenue)}
-                    </div>
-                    <div className="text-[10px] uppercase tracking-wide text-slate-500">
-                      est. revenue
-                    </div>
-                  </div>
-                  <Badge>{o.competition}</Badge>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+                  <div
+                    className="h-full rounded-full bg-x-blue"
+                    style={{ width: `${Math.min(100, o.demandScore)}%` }}
+                  />
                 </div>
               </div>
-              {/* demand meter */}
-              <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-brand-cyan to-brand-purple"
-                  style={{ width: `${Math.min(100, o.demandScore)}%` }}
-                />
+              <div className="text-right">
+                <div className="text-base font-bold text-x-blue">
+                  {inr(o.estRevenue)}
+                </div>
+                <div className="text-[10px] uppercase tracking-wide text-x-muted">
+                  est. revenue
+                </div>
               </div>
-            </Card>
-          ))}
-        </div>
+              <Badge>{o.competition}</Badge>
+            </div>
+          </TimelineRow>
+        ))
       )}
     </>
   );

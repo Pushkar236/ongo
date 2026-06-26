@@ -62,6 +62,27 @@ export interface Agent {
   permissions: string[];
 }
 
+export interface AgentTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentDetail {
+  id: string;
+  name: string;
+  type: string;
+  role: string;
+  status: string;
+  description?: string | null;
+  permissions: string[];
+  lastActiveAt?: string | null;
+  tasks: AgentTask[];
+}
+
 export interface Project {
   id: string;
   name: string;

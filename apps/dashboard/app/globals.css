@@ -1,14 +1,22 @@
 @import "tailwindcss";
 
-/* OnGo brand tokens — shared visual language with the public site. */
+/* ── X (Twitter)-style design tokens ───────────────────────────────────
+   OnGo's "agentic OS" command center adopts the X visual language: flat
+   near-black surfaces, hairline gray borders, a single blue accent. */
 @theme {
-  --color-ink-950: #020617;
-  --color-ink-900: #0f172a;
-  --color-ink-800: #1e293b;
-  --color-brand-blue: #2563eb;
-  --color-brand-cyan: #06b6d4;
-  --color-brand-purple: #8b5cf6;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-x-bg: #000000; /* app background */
+  --color-x-surface: #16181c; /* elevated cards / widgets */
+  --color-x-hover: #1d1f23; /* row + button hover */
+  --color-x-border: #2f3336; /* hairline dividers / borders */
+  --color-x-text: #e7e9ea; /* primary text */
+  --color-x-muted: #71767b; /* secondary text */
+  --color-x-blue: #1d9bf0; /* accent: links, active, primary */
+  --color-x-blue-hover: #1a8cd8;
+  --color-x-green: #00ba7c; /* success (sparing) */
+  --color-x-red: #f4212e; /* danger (sparing) */
+  --color-x-amber: #ffd400; /* caution (sparing) */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
 }
 
 html {
@@ -16,27 +24,57 @@ html {
 }
 
 body {
-  background:
-    radial-gradient(60rem 60rem at 80% -10%, rgba(37, 99, 235, 0.12), transparent 60%),
-    radial-gradient(50rem 50rem at -10% 20%, rgba(139, 92, 246, 0.1), transparent 55%),
-    linear-gradient(180deg, #0f172a 0%, #020617 100%);
-  background-attachment: fixed;
+  background: #000000;
   min-height: 100vh;
-  color: #e2e8f0;
+  color: #e7e9ea;
 }
 
-/* Glassmorphism surface */
-.glass {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Hairline divider used between feed rows. */
+.x-divider {
+  border-bottom: 1px solid var(--color-x-border);
+}
+
+/* Sticky, blurred column header — the only place blur is used (like X). */
+.x-blur-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-x-border);
 }
 
-.gradient-text {
-  background: linear-gradient(90deg, #06b6d4, #2563eb, #8b5cf6);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+/* Row hover highlight (feed items, nav, buttons). */
+.x-row-hover {
+  transition: background-color 0.15s ease;
+}
+.x-row-hover:hover {
+  background-color: var(--color-x-hover);
+}
+
+/* WORKING pulse — used on status dots and agent node rings. */
+@keyframes x-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.x-pulse {
+  animation: x-pulse 1.6s ease-in-out infinite;
+}
+
+/* Animated connector line from the Brain to a WORKING agent. */
+@keyframes x-dash {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+.x-dash {
+  stroke-dasharray: 4 4;
+  animation: x-dash 0.6s linear infinite;
 }
 
 ::-webkit-scrollbar {
@@ -44,6 +82,9 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
+  background: var(--color-x-border);
   border-radius: 9999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }

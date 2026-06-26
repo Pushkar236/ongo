@@ -1,7 +1,10 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
 import { apiFetch } from "@/lib/api";
 import type { SessionUser } from "@/lib/types";
+import { LeftRail } from "@/components/x/LeftRail";
+import { RightRail } from "@/components/x/RightRail";
+import { MobileTabBar } from "@/components/x/MobileTabBar";
 
 export default async function AppLayout({
   children,
@@ -16,11 +19,15 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar user={user} />
-      <main className="flex-1 overflow-y-auto p-8">
-        <div className="mx-auto max-w-6xl">{children}</div>
+    <div className="mx-auto flex min-h-screen w-full max-w-[1290px] justify-center">
+      <LeftRail user={user} />
+      <main className="min-h-screen w-full max-w-[640px] border-x border-x-border pb-20 md:pb-0">
+        {children}
       </main>
+      <Suspense fallback={<div className="hidden w-[350px] shrink-0 xl:block" />}>
+        <RightRail />
+      </Suspense>
+      <MobileTabBar />
     </div>
   );
 }
